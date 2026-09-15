@@ -1,0 +1,13 @@
+kcrunch
+kcrunch.exe
+*.o
+__pycache__/
+*.py[cod]
+*.lz
+*.prg
+*.sym
+*.dbg
+.source.txt
+monitor.log
+KickAss.jar
+dist/

@@ -1,0 +1,110 @@
+[
+  {
+    "profile": "baseline",
+    "game": "kabutocrunch",
+    "packed": 10480,
+    "seconds": 1.228
+  },
+  {
+    "profile": "baseline",
+    "game": "crackpots",
+    "packed": 13060,
+    "seconds": 1.239
+  },
+  {
+    "profile": "baseline",
+    "game": "abbey",
+    "packed": 44464,
+    "seconds": 0.653
+  },
+  {
+    "profile": "baseline",
+    "game": "fixit",
+    "packed": 38605,
+    "seconds": 0.844
+  },
+  {
+    "profile": "baseline",
+    "game": "pigquest",
+    "packed": 13649,
+    "seconds": 0.832
+  },
+  {
+    "profile": "baseline",
+    "game": "keystone",
+    "packed": 14828,
+    "seconds": 1.346
+  },
+  {
+    "profile": "lean",
+    "game": "kabutocrunch",
+    "packed": 10480,
+    "seconds": 0.72
+  },
+  {
+    "profile": "lean",
+    "game": "crackpots",
+    "packed": 13061,
+    "seconds": 0.902
+  },
+  {
+    "profile": "lean",
+    "game": "abbey",
+    "packed": 44466,
+    "seconds": 0.352
+  },
+  {
+    "profile": "lean",
+    "game": "fixit",
+    "packed": 38606,
+    "seconds": 0.467
+  },
+  {
+    "profile": "lean",
+    "game": "pigquest",
+    "packed": 13650,
+    "seconds": 0.602
+  },
+  {
+    "profile": "lean",
+    "game": "keystone",
+    "packed": 14829,
+    "seconds": 0.806
+  },
+  {
+    "profile": "wide",
+    "game": "kabutocrunch",
+    "packed": 10479,
+    "seconds": 2.625
+  },
+  {
+    "profile": "wide",
+    "game": "crackpots",
+    "packed": 13059,
+    "seconds": 3.596
+  },
+  {
+    "profile": "wide",
+    "game": "abbey",
+    "packed": 44461,
+    "seconds": 0.997
+  },
+  {
+    "profile": "wide",
+    "game": "fixit",
+    "packed": 38604,
+    "seconds": 1.573
+  },
+  {
+    "profile": "wide",
+    "game": "pigquest",
+    "packed": 13649,
+    "seconds": 2.976
+  },
+  {
+    "profile": "wide",
+    "game": "keystone",
+    "packed": 14827,
+    "seconds": 3.726
+  }
+]
