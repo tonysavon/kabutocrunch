@@ -59,15 +59,22 @@ faster default parse.
 
 ## 6502 Decruncher
 
-[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native Kabutocrunch decruncher.
-Its default build is 397 bytes and measures 26.755 cycles/output byte with the
-default parser setting. That is 14.81% faster than the 395-byte
-Dali-compatible build with `--speed 0`. Comment out `KCRUNCH_FAST_LITERALS` for a 339-byte
-build measuring 29.958 cycles/output byte.
+[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native Kabutocrunch
+decruncher. Its default build is 397 bytes and measures 26.755 cycles/output
+byte with the default parser setting, using **22.65% fewer cycles than the
+original Dali decoder** (321 bytes, 34.591 cycles/output byte). Comment out
+`KCRUNCH_FAST_LITERALS` for a 339-byte build measuring 29.958 cycles/output
+byte, still **13.39% fewer cycles than original Dali**.
 
-[`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) preserves the fast
-classic Dali decoder. It is 395 bytes and measures 28.046 cycles/output byte
-with the default parse, or 31.407 with the size-first `--speed 0` parse.
+[`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) provides Kabutocrunch's
+optimized Dali-compatible decoder. It is 395 bytes and measures 28.046
+cycles/output byte with the default parse: **18.92% fewer cycles than original
+Dali**, while retaining Dali bitstream compatibility. With `--speed 0`, it
+measures 31.407 cycles/output byte, a **9.20% cycle reduction**.
+
+These measurements cover the same six-game corpus. Default native output is
+2.73% larger than the size-first Dali baseline; default Dali-compatible output
+is 1.22% larger. See [performance details](docs/performance.md).
 
 ## Calling the decoder from your code
 
