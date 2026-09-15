@@ -1,11 +1,11 @@
 // Fast decoder for the default Kabuto raw-high bitstream.
-//#define ZX0RAW
+//#define KABUTORAW
 // Comment out for a smaller decoder that keeps the other hot-path wins.
 #define KCRUNCH_FAST_LITERALS
 
-#if ZX0RAW
-#define ZX0RAW_FAST
-.macro ZX0_RAWDECRUNCH(src,dst)
+#if KABUTORAW
+#define KABUTORAW_FAST
+.macro KABUTO_RAWDECRUNCH(src,dst)
 {
 	ldy #<src
 	ldx #>src
@@ -15,14 +15,14 @@
 	lda #>dst
 	sta.zp lz_dst + 1
 
-	jsr zx0.rawdecrunch
+	jsr kabuto.rawdecrunch
 }
 #else
-.macro ZX0_DECRUNCH(addr)
+.macro KABUTO_DECRUNCH(addr)
 {
 	ldy #<addr
     ldx #>addr
-    jsr zx0.decrunch
+    jsr kabuto.decrunch
 }
 #endif
 
@@ -34,7 +34,7 @@
 .label lz_bits			= CONFIG_ZP_ADDR + 0
 .label lz_dst			= CONFIG_ZP_ADDR + 1
 .label lz_src			= CONFIG_ZP_ADDR + 3
-#if ZX0RAW
+#if KABUTORAW
 .label lz_len_lo		= CONFIG_ZP_ADDR + 5
 .label lz_len_hi		= CONFIG_ZP_ADDR + 6
 .label lz_bit_byte		= CONFIG_ZP_ADDR + 7
@@ -72,16 +72,16 @@
 //---------------------------------------------------------------------------------
 //DEPACKER STUFF
 //---------------------------------------------------------------------------------
-zx0:
+kabuto:
 {
 	.const MATCH_LOOP_NORMAL = (lz_cp_match - (lz_match_loop + 2)) & $ff
 	.const MATCH_LOOP_RLE    = (lz_cp_store - (lz_match_loop + 2)) & $ff
 
-	#if ZX0RAW
+	#if KABUTORAW
 	rawdecrunch:
 			stx lz_src + 1
 			sty lz_src + 0
-#if ZX0RAW_FAST
+#if KABUTORAW_FAST
 			ldx #$02
 			:init_lz_bits()
 			ldy #$00                        //needs to be set in any case, also plain decomp enters here
@@ -442,7 +442,7 @@ raw_low_masks:
 			stx lz_len_hi
 	#endif
 
-#if !ZX0RAW || ZX0RAW_FAST
+#if !KABUTORAW || KABUTORAW_FAST
 #if INPLACE
 
 			beq lz_start_over

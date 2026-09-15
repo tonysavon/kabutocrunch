@@ -19,16 +19,17 @@ with tempfile.TemporaryDirectory(prefix='kc-examples-') as directory:
     for filename in ('data.bin', 'data.prg'):
         shutil.copyfile(ROOT / 'examples' / filename, temp / filename)
     for dali in (False, True):
-        flags = ['-dali'] if dali else []
+        flags = ['--dali'] if dali else []
+        packed_name = 'data-dali' if dali else 'data'
         run([str(encoder), *flags, '--binfile', '--no-inplace', '-o',
-             str(temp / 'data.lz'), str(temp / 'data.bin')])
+             str(temp / (packed_name + '.lz')), str(temp / 'data.bin')])
         run([str(encoder), *flags, '--inplace', '-o',
-             str(temp / 'data-inplace.prg'), str(temp / 'data.prg')])
+             str(temp / (packed_name + '-inplace.prg')), str(temp / 'data.prg')])
         decoder = ROOT / 'src/asm' / ('dcrunch_dali.asm' if dali else 'dcrunch.asm')
         for mode in ('regular', 'inplace'):
-            source = temp / (mode + '.asm')
+            source = temp / (mode + ('_dali' if dali else '') + '.asm')
             source.write_text((ROOT / 'examples' / source.name).read_text().replace(
-                '../src/asm/dcrunch.asm', decoder.as_posix()))
+                '../src/asm/' + decoder.name, decoder.as_posix()))
             image = temp / (mode + '.prg')
             run(['java', '-jar', str(args.kickass_jar.resolve()), str(source), '-o', str(image)])
             symbols = source.with_suffix('.sym').read_text()

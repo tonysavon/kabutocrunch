@@ -1,7 +1,7 @@
 // Preserve the calculated packed address; skip load and destination headers.
-#define KABUTORAW
+#define ZX0RAW
 #define INPLACE
-.var packedFile = LoadBinary("data-inplace.prg")
+.var packedFile = LoadBinary("data-dali-inplace.prg")
 .const packedAddress = (packedFile.get(0) & $ff) + 256 * (packedFile.get(1) & $ff) + 2
 .const destination = (packedFile.get(2) & $ff) + 256 * (packedFile.get(3) & $ff)
 * = $0801
@@ -11,9 +11,9 @@ start:
     cld
     lda #$34
     sta $01
-    :KABUTO_RAWDECRUNCH(packedAddress, destination)
+    :ZX0_RAWDECRUNCH(packedAddress, destination)
 done:
     jmp done
-#import "../src/asm/dcrunch.asm"
+#import "../src/asm/dcrunch_dali.asm"
 * = packedAddress
-    .import binary "data-inplace.prg", 4
+    .import binary "data-dali-inplace.prg", 4

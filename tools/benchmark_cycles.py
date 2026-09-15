@@ -105,6 +105,8 @@ def assemble_decoder(jar: pathlib.Path, directory: pathlib.Path,
                      dali: bool = False) -> bytes:
     source = directory / "cycle_decoder.asm"
     output = directory / "cycle_decoder.prg"
+    prefix = "ZX0" if dali else "KABUTO"
+    namespace = "zx0" if dali else "kabuto"
     decoder_name = "dcrunch_dali.asm" if dali else "dcrunch.asm"
     decoder = (ROOT / "src/asm" / decoder_name).resolve().as_posix()
     source.write_text(
@@ -112,8 +114,8 @@ def assemble_decoder(jar: pathlib.Path, directory: pathlib.Path,
         "        ldy #$00\n        ldx #$00\n"
         "        lda #$00\n        sta.zp lz_dst\n"
         "        lda #$00\n        sta.zp lz_dst + 1\n"
-        "        jsr zx0.rawdecrunch\n        brk\n"
-        "#define ZX0RAW\n#define ZX0RAW_FAST\n"
+        f"        jsr {namespace}.rawdecrunch\n        brk\n"
+        f"#define {prefix}RAW\n#define {prefix}RAW_FAST\n"
         f"#import \"{decoder}\"\n",
         encoding="ascii",
     )

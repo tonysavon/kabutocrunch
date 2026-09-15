@@ -83,7 +83,7 @@ regular decompression into a separate buffer and in-place decompression.
 
 ```asm
 // Regular: compress with --binfile --no-inplace.
-#define ZX0RAW
+#define KABUTORAW
 * = $0801
 BasicUpstart2(start)
 start:
@@ -91,7 +91,7 @@ start:
     cld
     lda #$34
     sta $01                 // RAM visible; interrupts remain disabled
-    :ZX0_RAWDECRUNCH(packed, $4000)
+    :KABUTO_RAWDECRUNCH(packed, $4000)
 done:
     jmp done                // decoded data is now at $4000
 #import "src/asm/dcrunch.asm"
@@ -106,7 +106,7 @@ first two bytes specify its load address; the next two specify the original
 destination. The example below skips both headers and calls the raw entry:
 
 ```asm
-#define ZX0RAW
+#define KABUTORAW
 #define INPLACE
 .var packedFile = LoadBinary("data-inplace.prg")
 .const packedAddress = (packedFile.get(0) & $ff) + 256 * (packedFile.get(1) & $ff) + 2
@@ -118,7 +118,7 @@ start:
     cld
     lda #$34
     sta $01
-    :ZX0_RAWDECRUNCH(packedAddress, destination)
+    :KABUTO_RAWDECRUNCH(packedAddress, destination)
 done:
     jmp done
 #import "src/asm/dcrunch.asm"
@@ -133,8 +133,34 @@ be writable RAM. Keep the decoder, stack, and caller outside the output area.
 For regular decompression, keep packed input outside the output area too.
 In-place streams require `INPLACE`; regular streams use the default build.
 
-For Dali, add `-dali` to the compression command and import
-`src/asm/dcrunch_dali.asm` instead. The raw macro and arguments are identical.
+### Dali-compatible calls
+
+The Dali decoder retains its `ZX0` names. Native Kabutocrunch uses `KABUTO`
+names; choose the interface that matches the compressed stream.
+
+| Interface | Native Kabutocrunch | Dali-compatible |
+|---|---|---|
+| Raw define | `KABUTORAW` | `ZX0RAW` |
+| Raw macro | `KABUTO_RAWDECRUNCH(src, dst)` | `ZX0_RAWDECRUNCH(src, dst)` |
+| Raw entry | `kabuto.rawdecrunch` | `zx0.rawdecrunch` |
+| Header-based macro | `KABUTO_DECRUNCH(addr)` | `ZX0_DECRUNCH(addr)` |
+| Header-based entry | `kabuto.decrunch` | `zx0.decrunch` |
+
+Compress with `--dali` and use the Dali decoder like this:
+
+```asm
+#define ZX0RAW
+// Add #define INPLACE for a --dali --inplace stream.
+// Inside your routine, after setting banking/interrupts as shown above:
+    :ZX0_RAWDECRUNCH(packed, $4000)
+// Place the decoder in writable RAM, outside the output region:
+#import "src/asm/dcrunch_dali.asm"
+```
+
+Complete Dali examples: [regular](examples/regular_dali.asm) and
+[in-place](examples/inplace_dali.asm). The same `INPLACE` define applies to
+both decoder families. For direct raw calls, Y/X contain the source low/high
+bytes and `lz_dst` contains the destination address.
 
 ## Cycle Harness
 
