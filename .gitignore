@@ -11,3 +11,4 @@ __pycache__/
 monitor.log
 KickAss.jar
 dist/
+examples/data.bin

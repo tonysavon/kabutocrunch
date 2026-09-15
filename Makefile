@@ -27,9 +27,10 @@ cycles: $(TARGET)
 
 	python tools/benchmark_cycles.py --kickass-jar "$(KICKASS)"
 
-test:
+test: $(TARGET)
 
 	python tools/test_release.py --kickass-jar "$(KICKASS)"
+	python tools/test_examples.py --kickass-jar "$(KICKASS)"
 
 sfx:
 

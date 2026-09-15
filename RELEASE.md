@@ -7,6 +7,7 @@
 - `src/asm/dcrunch.asm`, `dcrunch_dali.asm`: matching C64 decoders.
 - `src/asm/sfx/`: original Dali SFX assembly, provenance, and size assertion.
 - `Makefile`, `README.md`, `LICENSE`, `licenses/`: build, usage and licenses.
+- `examples/`: runnable regular and in-place KickAssembler integration examples.
 - `tools/`, `requirements-test.txt`: deterministic release tests, VICE smoke
   tests, SFX regeneration, and performance/search measurement tools.
 - `docs/`, `benchmarks/search-audit.json`: performance results and audit evidence.
@@ -32,3 +33,6 @@ Historical corpus measurements remain in docs/.
 
 SFX automatically selects Dali. Use `$01=$37` with `--cli` for the standard
 KERNAL IRQ handler; custom mappings require an appropriate visible handler.
+
+The four integration examples (native/Dali, regular/in-place) also assemble
+and byte-check successfully; `make test` now includes them.

@@ -1,10 +1,18 @@
 # kabutocrunch
 
-Kabutocrunch is a C99 LZ encoder for a small, fast C64 decruncher. It combines
-Salvador's match finder and parser with a Dali-derived stream whose long-offset
-high part is byte-coded for faster 6502 decoding. This raw-high format is not
-compatible with Dali or the earlier Kabutocrunch stream. Use `-dali` when a
-classic Dali-compatible stream is required.
+Kabutocrunch is a Commodore 64 cruncher built around small, fast 6502
+decrunchers. It draws on ZX0's LZ coding ideas and TSCrunch's explicit RLE
+support, with a dedicated fast path for repeated bytes. Its native format
+uses byte-coded long offsets to reduce decoding work on the C64.
+
+Kabutocrunch also supports Dali-compatible streams and provides a faster Dali
+decoder. Self-extracting PRGs use the original compact Dali SFX decoder.
+The C99 compressor builds on Salvador's match finder and parser; upstream
+credits and license notices are retained.
+
+The native raw-high stream requires the matching Kabutocrunch decoder; it is
+not compatible with Dali or earlier Kabutocrunch streams. Use `-dali` to emit
+classic Dali coding.
 
 ## Build
 
@@ -58,6 +66,66 @@ build measuring 29.958 cycles/output byte.
 [`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) preserves the fast
 classic Dali decoder. It is 395 bytes and measures 28.046 cycles/output byte
 with the default parse, or 31.407 with the size-first `--speed 0` parse.
+
+## Calling the decoder from your code
+
+Complete KickAssembler examples are in [examples](examples/README.md), covering
+regular decompression into a separate buffer and in-place decompression.
+
+```asm
+// Regular: compress with --binfile --no-inplace.
+#define ZX0RAW
+* = $0801
+BasicUpstart2(start)
+start:
+    sei
+    cld
+    lda #$34
+    sta $01                 // RAM visible; interrupts remain disabled
+    :ZX0_RAWDECRUNCH(packed, $4000)
+done:
+    jmp done                // decoded data is now at $4000
+#import "src/asm/dcrunch.asm"
+* = $8000
+packed:
+    .import binary "data.lz"
+```
+
+For **in-place** decompression, also define `INPLACE`, compress a PRG with
+`--inplace`, and keep the packed stream at its calculated address. The PRG's
+first two bytes specify its load address; the next two specify the original
+destination. The example below skips both headers and calls the raw entry:
+
+```asm
+#define ZX0RAW
+#define INPLACE
+.var packedFile = LoadBinary("data-inplace.prg")
+.const packedAddress = (packedFile.get(0) & $ff) + 256 * (packedFile.get(1) & $ff) + 2
+.const destination = (packedFile.get(2) & $ff) + 256 * (packedFile.get(3) & $ff)
+* = $0801
+BasicUpstart2(start)
+start:
+    sei
+    cld
+    lda #$34
+    sta $01
+    :ZX0_RAWDECRUNCH(packedAddress, destination)
+done:
+    jmp done
+#import "src/asm/dcrunch.asm"
+* = packedAddress
+    .import binary "data-inplace.prg", 4
+```
+
+These examples leave interrupts disabled and `$01=$34`. Restore the memory
+mapping and interrupt state required by your program after the call. The
+raw entry clobbers A/X/Y, flags, and zero page `$f8..$ff`; decoder code must
+be writable RAM. Keep the decoder, stack, and caller outside the output area.
+For regular decompression, keep packed input outside the output area too.
+In-place streams require `INPLACE`; regular streams use the default build.
+
+For Dali, add `-dali` to the compression command and import
+`src/asm/dcrunch_dali.asm` instead. The raw macro and arguments are identical.
 
 ## Cycle Harness
 
@@ -139,6 +207,7 @@ output extending under BASIC ROM, I/O and KERNAL ROM.
 
 ## Credits
 
+- TSCrunch by Antonio Savona ? explicit RLE inspiration
 - ZX0 by Einar Saukas
 - Salvador by Emmanuel Marty
 - Dali / Bitfire by Tobias Bindhammer
