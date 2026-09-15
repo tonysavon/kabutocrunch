@@ -2,17 +2,19 @@
 
 Kabutocrunch is a Commodore 64 cruncher built around small, fast 6502
 decrunchers. It draws on ZX0's LZ coding ideas and TSCrunch's explicit RLE
-support, with a dedicated fast path for repeated bytes. Its native format
-uses byte-coded long offsets to reduce decoding work on the C64.
+support, with a dedicated fast path for repeated bytes. Its proprietary
+bitstream and decoder modifications make decrunching faster than Dali.
 
-Kabutocrunch also supports Dali-compatible streams and provides a faster Dali
-decoder. Self-extracting PRGs use the original compact Dali SFX decoder.
+Dali compatibility is supported through the `--dali` switch, and a faster
+Dali-compatible decoder is provided.
+
+To make the transition easy, Kabutocrunch preserves Dali's command-line
+conventions while adding its own commands and options. This makes it easier
+to adopt Kabutocrunch in existing projects and build scripts. Use `--dali`
+when your project requires Dali-compatible packed data.
+
 The C99 compressor builds on Salvador's match finder and parser; upstream
 credits and license notices are retained.
-
-The native raw-high stream requires the matching Kabutocrunch decoder; it is
-not compatible with Dali or earlier Kabutocrunch streams. Use `-dali` to emit
-classic Dali coding.
 
 ## Build
 
@@ -34,7 +36,7 @@ the cruncher: the SFX byte arrays are checked in.
 # Raw binary input, suitable for the raw ASM decruncher
 ./kcrunch --binfile --no-inplace -o game.lz game.bin
 
-# Compress and byte-verify with the strict C raw-high decoder
+# Compress and byte-verify with the matching C decoder
 ./kcrunch --verify game.prg
 
 # Emit and verify a standard Dali stream
@@ -50,14 +52,14 @@ bitstream grammar or decoder. The default is `--speed 2`; use `--speed 0` for
 the smallest output, or a higher value when decrunch time matters more than
 packed size.
 
-`-dali` (also `--dali`) selects classic Dali offset and end-marker coding for
+`--dali` (also `-dali`) selects Dali-compatible streams for
 compression, decompression, and verification. It does not alter the parser:
 `-dali --speed 0` gives the size-first Dali parse, while plain `-dali` uses the
 faster default parse.
 
 ## 6502 Decruncher
 
-[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the raw-high decruncher.
+[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native Kabutocrunch decruncher.
 Its default build is 397 bytes and measures 26.755 cycles/output byte with the
 default parser setting. That is 14.81% faster than the 395-byte
 Dali-compatible build with `--speed 0`. Comment out `KCRUNCH_FAST_LITERALS` for a 339-byte
