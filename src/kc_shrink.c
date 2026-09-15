@@ -1240,6 +1240,8 @@ static int salvador_reduce_commands(salvador_compressor *pCompressor, const unsi
 static int salvador_write_literals(salvador_compressor* pCompressor, const unsigned char* pInWindow, const int nLiteralOffset, const int nNumLiterals, unsigned char* pOutData, const int nMaxOutDataSize, int nOutOffset, int* nCurBitsOffset, int* nCurBitShift, int* nIsFirstCommand, const int nIsBackward) {
    if (nNumLiterals <= 0)
       return nOutOffset;
+   if (nNumLiterals > MAX_VARLEN)
+      return -1;
 
    if (nNumLiterals < pCompressor->stats.min_literals || pCompressor->stats.min_literals == -1)
       pCompressor->stats.min_literals = nNumLiterals;
@@ -1951,6 +1953,11 @@ size_t salvador_compress(const unsigned char *pInputData,
    const int nBlockSize = (nInputSize < BLOCK_SIZE) ? ((nInputSize < 1024) ? 1024 : (int)nInputSize) : BLOCK_SIZE;
    const int nMaxOutBlockSize = (int)salvador_get_max_compressed_size(nBlockSize);
 
+   /* Keep every possible literal run representable by the 16-bit decoders. */
+   if (nDictionarySize > nInputSize ||
+       nInputSize - nDictionarySize == 0 ||
+       nInputSize - nDictionarySize > MAX_VARLEN)
+      return (size_t)-1;
    if (!kc_search_validate(search_config, NULL, 0)) return (size_t)-1;
 
    nResult = salvador_compressor_init(&compressor, nBlockSize,

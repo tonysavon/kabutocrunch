@@ -144,6 +144,28 @@ def main():
                     count_cycles(decoders[dali], packed.read_bytes(), data, 0x1000)
                     checks += 1
             print(f'raw OK: {name}', flush=True)
+        # Host-side format limits, not full-memory 6502 execution: the decoder,
+        # stack and packed source must still live somewhere on a real C64.
+        boundary = random.Random(921).randbytes(65536)
+        for dali in (False, True):
+            flags = ['--dali'] if dali else []
+            raw = temp / 'boundary.bin'
+            raw.write_bytes(boundary[:-1])
+            run([str(encoder), '--binfile', '--speed', '15', *flags, '--verify', str(raw)])
+            checks += 1
+            for cbm in (False, True):
+                raw.write_bytes((b'\x00\x00' if cbm else b'') + boundary)
+                for verify in (False, True):
+                    packed = temp / 'boundary.lz'
+                    packed.write_bytes(b'keep existing output')
+                    result = subprocess.run([str(encoder), *flags, '--speed', '15',
+                                             *([] if cbm else ['--binfile']),
+                                             *(['--verify'] if verify else ['--no-inplace']),
+                                             '-o', str(packed), str(raw)], capture_output=True)
+                    assert result.returncode != 0 and b'1..65535' in result.stderr
+                    assert packed.read_bytes() == b'keep existing output'
+                    checks += 1
+        print('payload limits OK', flush=True)
         sfx_cases = [(name, 0x1000, data) for name, data in cases]
         sfx_cases += [('under-rom-io', 0x9fff, bytes(range(256)) * 80),
                       ('near-top', 0xff00, b'T' * 240),

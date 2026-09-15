@@ -4,6 +4,7 @@
 #include <string.h>
 #include "sfx.h"
 #include "kc_lib.h"
+#include "kc_format.h"
 #include "decode.h"
 
 #define BUFFER_SIZE 65536
@@ -646,13 +647,14 @@ static void do_decompress(ctx* ctx) {
 }
 
 static void do_verify(ctx* ctx) {
-    FILE *fp = fopen(ctx->input_name, "rb");
-    if (!fp) { fprintf(stderr, "Cannot open '%s'\n", ctx->input_name); exit(1); }
-    fseek(fp, 0, SEEK_END); long osz = ftell(fp); fseek(fp, 0, SEEK_SET);
-    unsigned char *orig = (unsigned char*)malloc(osz);
-    fread(orig, 1, osz, fp); fclose(fp);
-
+    size_t osz;
+    unsigned char *orig = read_file(ctx->input_name, &osz);
     int hdr = (ctx->cbm && osz >= 2) ? 2 : 0;
+    if (osz <= (size_t)hdr || osz - hdr > MAX_VARLEN) {
+        fprintf(stderr, "Error: Payload must contain 1..65535 bytes\n");
+        free(orig);
+        exit(1);
+    }
     unsigned char *data = orig + hdr;
     int dsz = (int)(osz - hdr);
     if (hdr) ctx->cbm_orig_addr = orig[0] | (orig[1] << 8);
@@ -812,6 +814,11 @@ static void do_compress(ctx* ctx) {
     ctx->unpacked_data += (ctx->cbm_range_from - ctx->cbm_orig_addr);
     ctx->unpacked_size -= (size_t)(ctx->cbm_range_from - ctx->cbm_orig_addr);
     ctx->cbm_orig_addr = ctx->cbm_range_from;
+
+    if (ctx->unpacked_size > MAX_VARLEN) {
+        fprintf(stderr, "Error: Payload must contain 1..65535 bytes\n");
+        exit(1);
+    }
 
     if (ctx->sfx && (ctx->cbm_orig_addr < 0x0200 ||
         (size_t)ctx->cbm_orig_addr + ctx->unpacked_size > BUFFER_SIZE)) {

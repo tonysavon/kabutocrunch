@@ -3,5 +3,6 @@
 *.h text eol=lf
 *.asm text eol=lf
 *.py text eol=lf
+*.java text eol=lf
 *.md text eol=lf
 Makefile text eol=lf

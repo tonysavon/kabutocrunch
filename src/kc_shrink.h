@@ -154,6 +154,7 @@ void kc_set_token_cost(int token_cost);
 
 /**
  * Compress memory
+ * The payload (nInputSize minus nDictionarySize) must be 1..65535 bytes.
  *
  * @param pInputData pointer to input(source) data to compress
  * @param pOutBuffer buffer for compressed data

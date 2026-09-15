@@ -31,13 +31,22 @@ test: $(TARGET)
 
 	python tools/test_release.py --kickass-jar "$(KICKASS)"
 	python tools/test_examples.py --kickass-jar "$(KICKASS)"
+	python tools/test_plugin.py --kickass-jar "$(KICKASS)"
 
 sfx:
 
 	python tools/build_sfx.py --acme "$(ACME)"
 
+plugin:
+
+	python tools/build_plugin.py --kickass-jar "$(KICKASS)"
+
+test-plugin: $(TARGET)
+
+	python tools/test_plugin.py --kickass-jar "$(KICKASS)"
+
 clean:
 
 	rm -f $(TARGET)
 
-.PHONY: all cycles clean test sfx
+.PHONY: all cycles clean test sfx plugin test-plugin

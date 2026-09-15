@@ -43,9 +43,11 @@ the cruncher: the SFX byte arrays are checked in.
 ./kcrunch -dali --verify game.prg
 ```
 
-`--short` limits emitted match runs to 256 bytes. Literal runs remain
-unbounded because the command grammar does not permit consecutive literal
-runs.
+Payloads must contain 1..65,535 bytes (excluding a PRG load address and any
+prefix dictionary). `--from`/`--to` can select a smaller range from a 64 KiB
+input. Literal runs have the same 65,535-byte format limit. `--short` limits
+match runs to 256 bytes; it does not limit literal runs because the command
+grammar does not permit consecutive literal runs.
 
 `--speed N` biases the parser toward fewer commands without changing the
 bitstream grammar or decoder. The default is `--speed 2`; use `--speed 0` for
@@ -162,6 +164,37 @@ Complete Dali examples: [regular](examples/regular_dali.asm) and
 both decoder families. For direct raw calls, Y/X contain the source low/high
 bytes and `lz_dst` contains the destination address.
 
+## KickAssembler plugin
+
+The release includes a self-contained Java plugin using the same encoder.
+It needs Java 11 or newer; no native executable is called during assembly.
+
+```asm
+.plugin "kabutocrunch.KABUTO"
+* = $8000
+packed:
+.modify KABUTO() {                // raw=true, dali=false, speed=2
+    .pc = $1000 "code"
+    lda #$06
+    sta $d020
+    rts
+    .pc = $4000 "data"
+    .fill 512, i & $ff
+}
+```
+
+Arguments are positional: `KABUTO(raw, dali, speed)`. For example,
+`KABUTO(false, true, 2)` emits a Dali Mem stream. Both raw and Mem accept
+multiple memory regions, sorted by address and merged with zero-filled gaps.
+Decompression also writes zeros into those gaps. Mem includes the destination
+address; raw requires the destination in the decoder call. Neither mode
+automatically arranges in-place decompression.
+
+See [plugin setup and options](plugin/README.md) and the runnable
+[native raw](examples/plugin/raw.asm), [native Mem](examples/plugin/mem.asm),
+[Dali raw](examples/plugin/raw_dali.asm), and [Dali Mem](examples/plugin/mem_dali.asm)
+examples. All four are assembled and executed by the plugin tests.
+
 ## Cycle Harness
 
 The Python harness assembles the same raw fast decruncher, compresses the
@@ -239,10 +272,12 @@ the final jump. These are instruction-level tests with memory banking, not a
 replacement for a final VICE or real-C64 smoke test with VIC/CIA timing.
 The VICE smoke test checks all eight variant/relocation combinations, with
 output extending under BASIC ROM, I/O and KERNAL ROM.
+`make test` also builds the plugin, compares Java/C streams, and executes the
+raw/Mem plugin examples. Run `make test-plugin` to check only the plugin.
 
 ## Credits
 
-- TSCrunch by Antonio Savona ? explicit RLE inspiration
+- TSCrunch by Antonio Savona
 - ZX0 by Einar Saukas
 - Salvador by Emmanuel Marty
 - Dali / Bitfire by Tobias Bindhammer
@@ -250,6 +285,7 @@ output extending under BASIC ROM, I/O and KERNAL ROM.
 ## Distribution
 
 See [RELEASE.md](RELEASE.md) for the file manifest and validation record.
-The Windows executable is distributed separately from source.
+The Windows package includes the executable and cross-platform plugin JAR.
+The JAR is also available separately; its source is in `plugin/`.
 Original upstream notices are retained in [licenses](licenses); see
 [LICENSE](LICENSE) for the license applying to Kabutocrunch additions.

@@ -52,3 +52,8 @@ python tools/test_examples.py --kickass-jar /path/to/KickAss.jar
 
 The header expressions mask each byte with `$ff` because KickAssembler's
 `get()` can return signed byte values.
+
+For compression directly inside `.modify KABUTO()`, see the four
+[plugin examples](../plugin/README.md#decompression), covering raw and Mem in
+both formats with multiple memory regions. They need the plugin JAR on the
+assembler's classpath; they do not need precompressed data files.

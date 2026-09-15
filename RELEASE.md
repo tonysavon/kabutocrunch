@@ -8,6 +8,8 @@
 - `src/asm/sfx/`: original Dali SFX assembly, provenance, and size assertion.
 - `Makefile`, `README.md`, `LICENSE`, `licenses/`: build, usage and licenses.
 - `examples/`: runnable regular and in-place KickAssembler integration examples.
+- `plugin/`: Java encoder and KickAssembler modifier, documentation, and tests.
+  No Java command-line cruncher is included.
 - `tools/`, `requirements-test.txt`: deterministic release tests, VICE smoke
   tests, SFX regeneration, and performance/search measurement tools.
 - `docs/`, `benchmarks/search-audit.json`: performance results and audit evidence.
@@ -19,20 +21,43 @@ The original game-specific checksum harness is development-only and excluded.
 
 ## Windows binary package
 
-`kcrunch.exe`, README, LICENSE, all third-party license notices, both assembly
- decoders, and Dali SFX source/provenance. The executable is built from the
-same source snapshot as this repository. SHA-256 accompanies the archive.
+`kcrunch.exe`, `build/kabutocrunch-kickass.jar`, README, plugin instructions,
+LICENSE, all third-party license notices, both assembly decoders, runnable
+examples, and Dali SFX source/provenance. The executable and plugin are built
+from the same source snapshot. SHA-256 accompanies the archive. The plugin JAR
+is also distributed as a separate asset for Linux/macOS and existing setups.
+KickAssembler itself is not bundled.
 
 ## Validation
 
-The preceding audit passed 490 checks including six local games and eight
-full-machine VICE SFX executions. On 2026-09-15 the clean release snapshot passed all 442 self-contained
-round-trip/execution checks and eight full-machine VICE SFX checks. GCC
-built it with -Wall -Wextra -Werror; all four SFX arrays regenerated exactly.
-Historical corpus measurements remain in docs/.
+The preceding audit passed 490 checks including six local games. The updated
+release passes 452 self-contained native/SFX round-trip and execution checks,
+plus the four regular/in-place integration examples. GCC builds with
+`-Wall -Wextra -Werror`. Historical corpus measurements remain in docs/.
+All eight VICE SFX variant/relocation checks also pass, and all four SFX arrays
+regenerate byte-for-byte from the original Dali-derived assembly source.
+
+The plugin passes 62 Java/C byte comparisons with independent C verification,
+62 Java test-decoder round trips, suffix-array/length-code self-tests, concurrent
+encoder calls, eight assembled raw/Mem examples (both formats and region orders),
+four modifiers in one assembly, and ten invalid assembler inputs. Each example
+checks the full output including gaps and executes its decompressed code.
+
+Payloads are limited to 1..65,535 bytes. A 65,536-byte payload could previously
+produce an unrepresentable literal run at high speed settings. Both the C
+encoder and plugin now reject that size before emitting output; this does not
+increase decoder size. Host-side maximum-size tests are separate from 6502
+execution tests, which reserve memory for the decoder, stack and packed source.
 
 SFX automatically selects Dali. Use `$01=$37` with `--cli` for the standard
 KERNAL IRQ handler; custom mappings require an appropriate visible handler.
 
-The four integration examples (native/Dali, regular/in-place) also assemble
-and byte-check successfully; `make test` now includes them.
+`make test` includes native, SFX, integration-example and plugin tests.
+
+## Packaging
+
+After building and testing, `python tools/package_release.py` creates the source
+ZIP, Windows ZIP, separate plugin JAR and SHA256SUMS.txt under `dist/`. It packages
+tracked source files, excluding its `dist/` and `build/` outputs; stage any new
+release source files before running it. It requires the Windows executable and
+the plugin JAR to have been built already.

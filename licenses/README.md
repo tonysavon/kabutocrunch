@@ -13,3 +13,9 @@ Altered files are part of Kabutocrunch, not an unmodified upstream release.
 
 Individual source notices remain authoritative for their respective portions.
 Keep these notices with source and binary distributions.
+
+The plugin's Java encoder is an altered port of the Salvador-derived C code;
+its parser and match finder retain their zlib and CC0 notices. Its suffix-array
+implementation uses SA-IS rather than libdivsufsort. The KickAssembler interface
+wrapper is Kabutocrunch code under the root zlib license. KickAssembler itself
+and other cruncher plugins are not included in the JAR.
