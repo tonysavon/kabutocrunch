@@ -171,15 +171,9 @@ raw_long_offset:
 			lda lz_len_hi
 			lsr
 			sta raw_offset_hi + 1
-			lda lz_len_hi
-			and #$01
-			beq !+
-			lda #$80
-			bne !++
-!:
+			// LSR left the high-group low bit in C. Form $00/$80 and clear C.
 			lda #$00
-!:
-			clc
+			ror
 			adc lz_len_lo
 			adc #$01
 			sta raw_offset_lo + 1
@@ -533,7 +527,7 @@ lz_literal:
 			tax
 lz_l_page_:
 #if KCRUNCH_FAST_LITERALS
-			and #$f8
+			and #$f8			//Preserve C: ANC/ALR would corrupt short literal runs.
 			bne lz_cp_lit_fast_setup
 #endif
 lz_cp_lit:
