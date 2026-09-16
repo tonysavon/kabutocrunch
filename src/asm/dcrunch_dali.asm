@@ -4,7 +4,6 @@
 #define KCRUNCH_FAST_LITERALS
 
 #if ZX0RAW
-#define ZX0RAW_FAST
 .macro ZX0_RAWDECRUNCH(src,dst)
 {
 	ldy #<src
@@ -35,9 +34,7 @@
 .label lz_dst			= CONFIG_ZP_ADDR + 1
 .label lz_src			= CONFIG_ZP_ADDR + 3
 #if ZX0RAW
-.label lz_len_lo		= CONFIG_ZP_ADDR + 5
 .label lz_len_hi		= CONFIG_ZP_ADDR + 6
-.label lz_bit_byte		= CONFIG_ZP_ADDR + 7
 #else
 .label lz_len_hi		= CONFIG_ZP_ADDR + 5
 #endif
@@ -81,7 +78,6 @@ zx0:
 	rawdecrunch:
 			stx lz_src + 1
 			sty lz_src + 0
-#if ZX0RAW_FAST
 			ldx #$02
 			:init_lz_bits()
 			ldy #$00                        //needs to be set in any case, also plain decomp enters here
@@ -92,324 +88,6 @@ zx0:
 			// Keep this last: INPLACE startup relies on Z being set.
 			sty lz_len_hi
 
-#else
-			ldy #$00
-			sty lz_bits
-			sty lz_bit_byte
-			sty lz_len_hi
-			lda #$01
-			sta raw_offset_lo + 1
-			sty raw_offset_hi + 1
-
-			jsr raw_read_elias_le
-			jsr raw_copy_literals
-#if INPLACE
-			jsr raw_is_end
-			bcc !+
-			jmp raw_done
-!:
-#endif
-
-raw_after_literal:
-			jsr raw_read_bit
-			bcs raw_new_offset
-			jsr raw_read_elias_le
-			jsr raw_copy_match
-#if INPLACE
-			jsr raw_is_end
-			bcc !+
-			jmp raw_done
-!:
-#endif
-
-raw_after_match:
-			jsr raw_read_bit
-			bcs raw_new_offset
-			jsr raw_read_elias_le
-			jsr raw_copy_literals
-#if INPLACE
-			jsr raw_is_end
-			bcc !+
-			jmp raw_done
-!:
-#endif
-			jmp raw_after_literal
-
-raw_new_offset:
-			jsr raw_read_bit
-			bcs raw_long_offset
-
-			jsr raw_read_4_bits
-			clc
-			adc #$01
-			sta raw_offset_lo + 1
-			lda #$00
-			sta raw_offset_hi + 1
-			jsr raw_read_elias_le
-			jsr raw_inc_len
-			jsr raw_copy_match
-#if INPLACE
-			jsr raw_is_end
-			bcc !+
-			jmp raw_done
-!:
-#endif
-			jmp raw_after_match
-
-raw_long_offset:
-			jsr raw_read_elias
-			lda lz_len_lo
-			beq raw_done
-			sec
-			sbc #$01
-			sta lz_len_hi
-
-			jsr raw_read_byte
-			pha
-			lsr
-			sta lz_len_lo
-
-			lda lz_len_hi
-			lsr
-			sta raw_offset_hi + 1
-			// LSR left the high-group low bit in C. Form $00/$80 and clear C.
-			lda #$00
-			ror
-			adc lz_len_lo
-			adc #$01
-			sta raw_offset_lo + 1
-			bcc !+
-			inc raw_offset_hi + 1
-!:
-			pla
-			and #$01
-			bne !+
-			jsr raw_read_elias_le_skip
-			jsr raw_inc_len
-			jmp !++
-!:
-			lda #$02
-			sta lz_len_lo
-			lda #$00
-			sta lz_len_hi
-!:
-			jsr raw_copy_match
-#if INPLACE
-			jsr raw_is_end
-			bcc !+
-			jmp raw_done
-!:
-#endif
-			jmp raw_after_match
-
-raw_done:
-			rts
-
-#if INPLACE
-raw_is_end:
-			lda lz_dst + 0
-			cmp lz_src + 0
-			bne !+
-			lda lz_dst + 1
-			cmp lz_src + 1
-			beq !done+
-!:
-			clc
-			rts
-!done:
-			sec
-			rts
-#endif
-
-raw_read_byte:
-			lda (lz_src),y
-			inc lz_src + 0
-			bne !+
-			inc lz_src + 1
-!:
-			rts
-
-raw_read_bit:
-			lsr lz_bits
-			bne !+
-			lda #$80
-			sta lz_bits
-			jsr raw_read_byte
-			sta lz_bit_byte
-!:
-			lda lz_bit_byte
-			and lz_bits
-			beq !+
-			sec
-			rts
-!:
-			clc
-			rts
-
-raw_read_4_bits:
-			lda #$00
-			sta lz_len_lo
-			ldx #$04
-!:
-			jsr raw_read_bit
-			rol lz_len_lo
-			dex
-			bne !-
-			lda lz_len_lo
-			rts
-
-raw_read_elias_le:
-			jsr raw_read_elias
-			jmp raw_elias_to_le
-
-raw_read_elias_le_skip:
-			jsr raw_read_elias_skip
-			jmp raw_elias_to_le
-
-raw_read_elias:
-			lda #$01
-			sta lz_len_lo
-			lda #$00
-			sta lz_len_hi
-!:
-			jsr raw_read_bit
-			bcs !done+
-raw_elias_payload:
-			asl lz_len_lo
-			rol lz_len_hi
-			jsr raw_read_bit
-			bcc !+
-			inc lz_len_lo
-			bne !+
-			inc lz_len_hi
-!:
-			jmp !--
-!done:
-			rts
-
-raw_read_elias_skip:
-			lda #$01
-			sta lz_len_lo
-			lda #$00
-			sta lz_len_hi
-			jmp raw_elias_payload
-
-raw_elias_to_le:
-			lda lz_len_hi
-			bne !+
-			rts
-!:
-			ldx #$07
-			cmp #$80
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$40
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$20
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$10
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$08
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$04
-			bcs raw_elias_le_known_bit
-			dex
-			cmp #$02
-			bcs raw_elias_le_known_bit
-			dex
-raw_elias_le_known_bit:
-			lda raw_low_masks,x
-			and lz_len_lo
-			pha
-			lda raw_bit_masks,x
-			pha
-			eor #$ff
-			and lz_len_hi
-			sta lz_len_hi
-			cpx #$00
-			beq !shift_done+
-!shift:
-			lsr lz_len_hi
-			ror lz_len_lo
-			dex
-			bne !shift-
-!shift_done:
-			pla
-			sta lz_len_hi
-			pla
-			ora lz_len_hi
-			sta lz_len_hi
-			rts
-
-raw_inc_len:
-			inc lz_len_lo
-			bne !+
-			inc lz_len_hi
-!:
-			rts
-
-raw_dec_len:
-			lda lz_len_lo
-			bne !+
-			dec lz_len_hi
-!:
-			dec lz_len_lo
-			lda lz_len_lo
-			ora lz_len_hi
-			rts
-
-raw_copy_literals:
-			lda lz_len_lo
-			ora lz_len_hi
-			beq !done+
-!:
-			jsr raw_read_byte
-			sta (lz_dst),y
-			inc lz_dst + 0
-			bne !+
-			inc lz_dst + 1
-!:
-			jsr raw_dec_len
-			bne !--
-!done:
-			rts
-
-raw_copy_match:
-			lda lz_dst + 0
-			sec
-raw_offset_lo:	sbc #$00
-			sta raw_match_src + 1
-			lda lz_dst + 1
-raw_offset_hi:	sbc #$00
-			sta raw_match_src + 2
-			lda lz_len_lo
-			ora lz_len_hi
-			beq !done+
-!:
-raw_match_src:	lda $beef
-			sta (lz_dst),y
-			inc raw_match_src + 1
-			bne !+
-			inc raw_match_src + 2
-!:
-			inc lz_dst + 0
-			bne !+
-			inc lz_dst + 1
-!:
-			jsr raw_dec_len
-			bne !---
-!done:
-			rts
-
-raw_bit_masks:
-			.byte $01,$02,$04,$08,$10,$20,$40,$80
-raw_low_masks:
-			.byte $00,$01,$03,$07,$0f,$1f,$3f,$7f
-#endif
 
 	#else
 	decrunch:
@@ -437,7 +115,6 @@ raw_low_masks:
 			stx lz_len_hi
 	#endif
 
-#if !ZX0RAW || ZX0RAW_FAST
 #if INPLACE
 
 			beq lz_start_over
@@ -762,7 +439,6 @@ lz_length_16:						//happens very rarely
 			tya
 !skp:
 			rts
-#endif
 }
 
 /*

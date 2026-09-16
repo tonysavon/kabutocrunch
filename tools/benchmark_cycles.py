@@ -121,7 +121,7 @@ def assemble_decoder(jar: pathlib.Path, directory: pathlib.Path,
         "        lda #$00\n        sta.zp lz_dst\n"
         "        lda #$00\n        sta.zp lz_dst + 1\n"
         f"        jsr {namespace}.rawdecrunch\n        brk\n"
-        f"#define {prefix}RAW\n#define {prefix}RAW_FAST\n"
+        f"#define {prefix}RAW\n"
         f"#import \"{decoder}\"\n",
         encoding="ascii",
     )
