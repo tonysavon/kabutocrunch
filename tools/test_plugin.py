@@ -10,7 +10,6 @@ import sys
 import tempfile
 import zipfile
 
-from build_plugin import build
 from benchmark_cycles import ROOT, KICKASS, MPU, install_undocumented, build_encoder
 from test_release import C64Memory
 
@@ -27,44 +26,52 @@ def main():
     parser.add_argument('--kickass-jar', type=pathlib.Path, default=KICKASS)
     args = parser.parse_args()
     kickass = args.kickass_jar.resolve()
-    jar = build(kickass)
+    source_checkout = (ROOT / 'plugin/src/main/java').is_dir()
+    if source_checkout:
+        from build_plugin import build
+        jar = build(kickass)
+    else:
+        jar = ROOT / 'build/kabutocrunch-kickass.jar'
+        if not jar.is_file():
+            raise RuntimeError('Packaged plugin JAR is missing')
     with zipfile.ZipFile(jar) as archive:
         assert not any(name.endswith(('Decoder.class', 'SelfTest.class', 'PluginTest.class', 'Kabutocrunch.class'))
                        for name in archive.namelist()), 'test/CLI classes in production JAR'
     with tempfile.TemporaryDirectory(prefix='kabuto-plugin-test-') as directory:
         temp = pathlib.Path(directory)
         encoder = build_encoder(temp)
-        classes = temp / 'classes'
-        run(['javac', '--release', '11', '-encoding', 'UTF-8', '-cp', os.pathsep.join(map(str, (kickass, jar))),
-             '-d', classes, *sorted((ROOT / 'plugin/src/test/java').rglob('*.java'))])
-        rng = random.Random(921)
-        random64k = rng.randbytes(65536)
-        cases = [('one', b'x', (0, 2, 15)),
-                 ('boundaries', b''.join(rng.randbytes(n) * 3 for n in (127, 128, 255, 256, 1023, 1024)), range(16)),
-                 ('sparse', b'ABCD' * 128 + bytes(0x3000 - 512) + bytes(range(256)) * 2, (0, 2, 15)),
-                 ('rle-max', bytes(65535), (0, 2, 15)),
-                 ('random-max', random64k[:-1], (0, 2, 15)),
-                 ('long-offset', random64k[:32640] + random64k[:1024], (0, 2, 15))]
-        configurations = []
-        for name, data, speeds in cases:
-            source = temp / (name + '.bin')
-            source.write_bytes(data)
-            for dali in (False, True):
-                for speed in speeds:
-                    packed = temp / f'{name}-{dali}-{speed}.lz'
-                    configurations.append((source, packed, dali, speed))
-        manifest = temp / 'cases.tsv'
-        manifest.write_text('\n'.join(f'{source}\t{packed}\t{str(dali).lower()}\t{speed}'
-                                      for source, packed, dali, speed in configurations))
-        print(run(['java', '-Xmx1g', '-cp', os.pathsep.join(map(str, (classes, jar, kickass))),
-                   'kabutocrunch.PluginTest', manifest]), end='', flush=True)
-        for source, packed, dali, speed in configurations:
-            flags = ['--dali'] if dali else []
-            reference = temp / 'reference.lz'
-            run([encoder, '--binfile', '--no-inplace', '--speed', speed, *flags, '-o', reference, source])
-            assert reference.read_bytes() == packed.read_bytes(), (source.name, dali, speed)
-            run([encoder, '--binfile', *flags, '--verify-packed', packed, source])
-        print(f'PASS: {len(configurations)} Java/C byte comparisons and C decoder round trips', flush=True)
+        if source_checkout:
+            classes = temp / 'classes'
+            run(['javac', '--release', '11', '-encoding', 'UTF-8', '-cp', os.pathsep.join(map(str, (kickass, jar))),
+                 '-d', classes, *sorted((ROOT / 'plugin/src/test/java').rglob('*.java'))])
+            rng = random.Random(921)
+            random64k = rng.randbytes(65536)
+            cases = [('one', b'x', (0, 2, 15)),
+                     ('boundaries', b''.join(rng.randbytes(n) * 3 for n in (127, 128, 255, 256, 1023, 1024)), range(16)),
+                     ('sparse', b'ABCD' * 128 + bytes(0x3000 - 512) + bytes(range(256)) * 2, (0, 2, 15)),
+                     ('rle-max', bytes(65535), (0, 2, 15)),
+                     ('random-max', random64k[:-1], (0, 2, 15)),
+                     ('long-offset', random64k[:32640] + random64k[:1024], (0, 2, 15))]
+            configurations = []
+            for name, data, speeds in cases:
+                source = temp / (name + '.bin')
+                source.write_bytes(data)
+                for dali in (False, True):
+                    for speed in speeds:
+                        packed = temp / f'{name}-{dali}-{speed}.lz'
+                        configurations.append((source, packed, dali, speed))
+            manifest = temp / 'cases.tsv'
+            manifest.write_text('\n'.join(f'{source}\t{packed}\t{str(dali).lower()}\t{speed}'
+                                          for source, packed, dali, speed in configurations))
+            print(run(['java', '-Xmx1g', '-cp', os.pathsep.join(map(str, (classes, jar, kickass))),
+                       'kabutocrunch.PluginTest', manifest]), end='', flush=True)
+            for source, packed, dali, speed in configurations:
+                flags = ['--dali'] if dali else []
+                reference = temp / 'reference.lz'
+                run([encoder, '--binfile', '--no-inplace', '--speed', speed, *flags, '-o', reference, source])
+                assert reference.read_bytes() == packed.read_bytes(), (source.name, dali, speed)
+                run([encoder, '--binfile', *flags, '--verify-packed', packed, source])
+            print(f'PASS: {len(configurations)} Java/C byte comparisons and C decoder round trips', flush=True)
 
         launcher = ['java', '-Xmx1g', '-cp', os.pathsep.join(map(str, (kickass, jar))), 'kickass.KickAssembler']
 

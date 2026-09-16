@@ -92,6 +92,12 @@ def run(command: list[str], cwd: pathlib.Path = ROOT) -> None:
 
 
 def build_encoder(directory: pathlib.Path) -> pathlib.Path:
+    # Binary release ZIPs deliberately omit compiler sources.
+    if not (ROOT / "src/kcrunch.c").is_file():
+        prebuilt = ROOT / ("kcrunch.exe" if sys.platform == "win32" else "kcrunch")
+        if not prebuilt.is_file():
+            raise BenchmarkError("This package needs its prebuilt kcrunch executable")
+        return prebuilt
     executable = directory / ("kcrunch-cycle.exe" if sys.platform == "win32" else "kcrunch-cycle")
     run([
         "gcc", "-O3", "-std=c99", "-Wall", "-Wextra", "-Werror",

@@ -1,4 +1,4 @@
-// Fast decoder for the default Kabuto raw-high bitstream.
+// Fast decoder for the default KabutoCrunch bitstream.
 //#define KABUTORAW
 // Comment out for a smaller decoder that keeps the other hot-path wins.
 #define KCRUNCH_FAST_LITERALS

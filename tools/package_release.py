@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Package the tested Windows executable and Java plugin with tracked source."""
+"""Package the Windows executable, plugin, ASM, documentation and binary tests."""
+import argparse
 import hashlib
 import pathlib
-import shutil
 import subprocess
 import zipfile
 
@@ -19,29 +19,33 @@ def archive(path, entries):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--version', default='1.0')
+    args = parser.parse_args()
+    if not args.version or any(c not in '0123456789.-' for c in args.version):
+        raise SystemExit('Version must contain only digits, dots and hyphens')
     executable = ROOT / 'kcrunch.exe'
     plugin = ROOT / 'build/kabutocrunch-kickass.jar'
     if not executable.is_file() or not plugin.is_file():
         raise SystemExit('Build kcrunch.exe and the plugin JAR before packaging')
     names = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     names = [name for name in names if name]
-    if 'plugin/src/main/java/kabutocrunch/KABUTO.java' not in names:
-        raise SystemExit('Stage new release source files before packaging')
     source = {name: (ROOT / name).read_bytes() for name in names}
+    test_files = ('tools/benchmark_cycles.py', 'tools/test_release.py',
+                  'tools/test_examples.py', 'tools/test_plugin.py', 'tools/smoke_vice.py')
     binary = {name: data for name, data in source.items()
-              if name in ('README.md', 'RELEASE.md', 'LICENSE', 'plugin/README.md')
-              or name.startswith(('licenses/', 'src/asm/', 'examples/', 'docs/'))}
+              if name in ('README.md', 'RELEASE.md', 'LICENSE', 'plugin/README.md',
+                          'requirements-test.txt', 'docs/performance.md', *test_files)
+              or name.startswith(('licenses/', 'src/asm/', 'examples/'))}
     binary['kcrunch.exe'] = executable.read_bytes()
     binary['build/kabutocrunch-kickass.jar'] = plugin.read_bytes()
     dist = ROOT / 'dist'
     dist.mkdir(exist_ok=True)
-    archive(dist / 'kabutocrunch-source.zip', source)
-    archive(dist / 'kabutocrunch-windows-x64.zip', binary)
-    shutil.copyfile(plugin, dist / plugin.name)
-    assets = [dist / name for name in ('kabutocrunch-source.zip', 'kabutocrunch-windows-x64.zip', plugin.name)]
+    assets = [dist / f'kabutocrunch-{args.version}-windows-x64.zip']
+    archive(assets[0], binary)
     (dist / 'SHA256SUMS.txt').write_text(''.join(
         hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n' for path in assets))
-    print(f'Packaged {len(source)} source files, Windows executable and plugin under {dist}')
+    print(f'Packaged {len(binary)} files without C/Java sources: {assets[0]}')
 
 
 if __name__ == '__main__':

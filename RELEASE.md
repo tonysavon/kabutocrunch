@@ -1,4 +1,4 @@
-# Initial private release preparation
+# KabutoCrunch 1.0
 
 ## Source repository contents
 
@@ -25,8 +25,12 @@ The original game-specific checksum harness is development-only and excluded.
 LICENSE, all third-party license notices, both assembly decoders, runnable
 examples, and Dali SFX source/provenance. The executable and plugin are built
 from the same source snapshot. SHA-256 accompanies the archive. The plugin JAR
-is also distributed as a separate asset for Linux/macOS and existing setups.
+inside the ZIP is cross-platform and can also be used on Linux/macOS.
 KickAssembler itself is not bundled.
+The versioned Windows ZIP excludes all C and Java sources. It includes Python
+tests that use the packaged binaries: native/SFX execution, regular/in-place
+examples, plugin raw/Mem examples and optional VICE smoke checks. These tests
+require Python, py65, Java and KickAssembler, but no C compiler or JDK.
 
 ## Validation
 
@@ -56,8 +60,9 @@ KERNAL IRQ handler; custom mappings require an appropriate visible handler.
 
 ## Packaging
 
-After building and testing, `python tools/package_release.py` creates the source
-ZIP, Windows ZIP, separate plugin JAR and SHA256SUMS.txt under `dist/`. It packages
-tracked source files, excluding its `dist/` and `build/` outputs; stage any new
-release source files before running it. It requires the Windows executable and
-the plugin JAR to have been built already.
+After building and testing, `python tools/package_release.py --version 1.0`
+creates `dist/kabutocrunch-1.0-windows-x64.zip` and `dist/SHA256SUMS.txt`.
+The manifest includes only the executable, plugin, docs/licenses, assembly,
+examples and binary-compatible Python tests. The executable and JAR must already
+have been built. Source remains available in the repository; it is not included
+in this ZIP.

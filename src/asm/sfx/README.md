@@ -4,7 +4,7 @@
 https://github.com/bboxy/bitfire at commit
 `f443e652f00384a8ed53eb115826b580c2618a16` (Tobias Bindhammer).
 Its BSD license is retained in the source. Distribute that notice with binaries.
-Kabutocrunch adds an assembly size assertion; the decoder is otherwise original.
+KabutoCrunch adds an assembly size assertion; the decoder is otherwise original.
 
 The loader copies its decoder to $01..$ff, using an eight-bit index, and
 relocates compressed data to the top of RAM. The 328-byte previous compact

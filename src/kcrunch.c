@@ -61,7 +61,7 @@ typedef struct ctx {
 } ctx;
 
 static const char *stream_name(const ctx *ctx) {
-    return ctx->dali ? "Dali" : "Kabuto raw-high";
+    return ctx->dali ? "Dali" : "KabutoCrunch";
 }
 
 static int decode_stream(const ctx *ctx, const unsigned char *packed,
@@ -213,11 +213,11 @@ static void adjust_inplace_stream(ctx* ctx) {
         packed_size_for_overlap = ctx->packed_size;
     }
     else {
-        /* Raw-high EOD is two control bits followed by one raw zero byte.
+        /* KabutoCrunch EOD is two control bits followed by one raw zero byte.
          * Keep the original read limit while parsing because the control byte
          * can contain bits from the prior token. */
         if (ctx->packed_size == 0 || ctx->packed_data[ctx->packed_size - 1] != 0) {
-            fprintf(stderr, "Error: Invalid raw-high end marker\n");
+            fprintf(stderr, "Error: Invalid KabutoCrunch end marker\n");
             exit(1);
         }
         packed_size_for_overlap = ctx->packed_size - 1;
@@ -1024,8 +1024,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (ctx.sfx) ctx.dali = TRUE;
-    printf("kabutocrunch - %s stream encoder/decoder\n", stream_name(&ctx));
-    printf("based on salvador by Emmanuel Marty and Dali by Tobias Bindhammer\n");
+    printf("KabutoCrunch - by Antonio Savona\n");
 
     if (argc <= 2 && show_version) exit(0);
     if (argc == 1 || !exit_help) {

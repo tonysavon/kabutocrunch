@@ -1,5 +1,5 @@
 /*
- * Strict decoders for Kabuto raw-high and classic Dali streams.
+ * Strict decoders for KabutoCrunch and classic Dali streams.
  *
  * Test-only Java port of src/decode.c; not included in the plugin JAR.
  */
@@ -270,7 +270,7 @@ public final class Decoder {
             decoder.error != null ? decoder.error : "malformed stream");
     }
 
-    /** Kabuto raw-high stream. */
+    /** KabutoCrunch stream. */
     public static Result decode(byte[] packed, int packedSize, byte[] output, int outputCap) {
         return decodeFormat(packed, packedSize, output, outputCap, false);
     }

@@ -1,5 +1,5 @@
 /*
- * decode.c - strict C decoders for Kabuto raw-high and classic Dali streams
+ * decode.c - strict C decoders for KabutoCrunch and classic Dali streams
  */
 #include <stdint.h>
 #include "decode.h"

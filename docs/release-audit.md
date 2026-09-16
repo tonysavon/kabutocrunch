@@ -1,6 +1,6 @@
 # Release audit, 2026-09-14
 
-The existing raw-high decoder remains 397 bytes and reproduced the recorded
+The existing KabutoCrunch decoder remains 397 bytes and reproduced the recorded
 8,809,705 cycles over 329,268 output bytes (26.755424 cycles/byte). No decoder
 or stream change was warranted by this review. SFX is now enabled using the
 original Dali source, with automatic selection of Dali coding.
@@ -31,7 +31,7 @@ For further *C64* speed, the most promising decoder-size-neutral work is a
 more detailed parser cost model: distinguish literal-copy setup, short and long
 offsets, distance-one matches, and page-spanning runs. The current `--speed`
 penalty treats commands uniformly. Such a model needs separate measurements
-for raw-high, compact, and SFX decoders; it is a future experiment, not a
+for KabutoCrunch, compact, and SFX decoders; it is a future experiment, not a
 measured gain claimed by this audit. Existing `--speed` settings already offer
 a substantial measured size/speed tradeoff.
 

@@ -1,7 +1,7 @@
-# Kabutocrunch for KickAssembler
+# KabutoCrunch for KickAssembler
 
 Use `.modify KABUTO()` to compress assembled code and data. The plugin is shipped
-with Kabutocrunch and uses a Java port of its encoder. It does not launch the C
+with KabutoCrunch and uses a Java port of its encoder. It does not launch the C
 executable, require native libraries, or provide a Java command-line cruncher.
 
 Tested with KickAssembler 5.25. Requires Java 11 or newer. KickAssembler itself
@@ -47,7 +47,7 @@ compression cache between assemblies.
 | Position | Parameter | Default | Meaning |
 |---|---|---|---|
 | 1 | `raw` | `true` | Raw stream; `false` includes a destination header (Mem) |
-| 2 | `dali` | `false` | Native Kabutocrunch; `true` matches C `--dali` |
+| 2 | `dali` | `false` | Native KabutoCrunch; `true` matches C `--dali` |
 | 3 | `speed` | `2` | Integer 0..15, matching C `--speed` |
 
 Arguments are positional, with optional trailing arguments. `raw=true` inside
@@ -114,6 +114,16 @@ order, executes its decoder, checks every output/gap byte, and calls the restore
 code. These are 6502 instruction-level tests, not VIC/CIA timing tests.
 
 ## Build and test
+
+The Windows release ZIP already contains the JAR. Its plugin tests run without
+a compiler or Java sources:
+
+```sh
+python tools/test_plugin.py --kickass-jar /path/to/KickAss.jar
+```
+
+Building the plugin and running its Java source-level tests requires the GitHub
+source checkout. The following build instructions apply to that checkout.
 
 Requires a JDK (including `javac`), Python 3.10+ and your KickAssembler JAR:
 

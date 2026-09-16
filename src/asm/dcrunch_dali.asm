@@ -88,7 +88,7 @@ zx0:
 			sty lz_offset_lo + 1           //initialize offset with $0000
 			sty lz_offset_hi + 1
 			// The branch operand is assembled for the initial distance-1 state,
-			// matching the raw-high decoder, so no runtime patch is needed here.
+			// matching the KabutoCrunch decoder, so no runtime patch is needed here.
 			// Keep this last: INPLACE startup relies on Z being set.
 			sty lz_len_hi
 

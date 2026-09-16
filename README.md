@@ -1,6 +1,6 @@
-# kabutocrunch
+# KabutoCrunch
 
-Kabutocrunch is a Commodore 64 cruncher built around small, fast 6502
+KabutoCrunch is a Commodore 64 cruncher built around small, fast 6502
 decrunchers. It draws on ZX0's LZ coding ideas and TSCrunch's explicit RLE
 support, with a dedicated fast path for repeated bytes. Its proprietary
 bitstream and decoder modifications make decrunching faster than Dali.
@@ -8,15 +8,20 @@ bitstream and decoder modifications make decrunching faster than Dali.
 Dali compatibility is supported through the `--dali` switch, and a faster
 Dali-compatible decoder is provided.
 
-To make the transition easy, Kabutocrunch preserves Dali's command-line
+To make the transition easy, KabutoCrunch preserves Dali's command-line
 conventions while adding its own commands and options. This makes it easier
-to adopt Kabutocrunch in existing projects and build scripts. Use `--dali`
+to adopt KabutoCrunch in existing projects and build scripts. Use `--dali`
 when your project requires Dali-compatible packed data.
 
 The C99 compressor builds on Salvador's match finder and parser; upstream
 credits and license notices are retained.
 
 ## Build
+
+The Windows release ZIP already includes `kcrunch.exe`, the plugin JAR, assembly
+decoders, documentation, examples and tests. Extract it to a folder and use the
+executable directly; no compiler is needed. The commands below are for building
+from the GitHub source checkout, which is not included in the binary ZIP.
 
 ```sh
 make
@@ -61,14 +66,14 @@ faster default parse.
 
 ## 6502 Decruncher
 
-[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native Kabutocrunch
+[`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native KabutoCrunch
 decruncher. Its default build is 397 bytes and measures 26.755 cycles/output
 byte with the default parser setting, using **22.65% fewer cycles than the
 original Dali decoder** (321 bytes, 34.591 cycles/output byte). Comment out
 `KCRUNCH_FAST_LITERALS` for a 339-byte build measuring 29.958 cycles/output
 byte, still **13.39% fewer cycles than original Dali**.
 
-[`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) provides Kabutocrunch's
+[`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) provides KabutoCrunch's
 optimized Dali-compatible decoder. It is 395 bytes and measures 28.046
 cycles/output byte with the default parse: **18.92% fewer cycles than original
 Dali**, while retaining Dali bitstream compatibility. With `--speed 0`, it
@@ -137,10 +142,10 @@ In-place streams require `INPLACE`; regular streams use the default build.
 
 ### Dali-compatible calls
 
-The Dali decoder retains its `ZX0` names. Native Kabutocrunch uses `KABUTO`
+The Dali decoder retains its `ZX0` names. Native KabutoCrunch uses `KABUTO`
 names; choose the interface that matches the compressed stream.
 
-| Interface | Native Kabutocrunch | Dali-compatible |
+| Interface | Native KabutoCrunch | Dali-compatible |
 |---|---|---|
 | Raw define | `KABUTORAW` | `ZX0RAW` |
 | Raw macro | `KABUTO_RAWDECRUNCH(src, dst)` | `ZX0_RAWDECRUNCH(src, dst)` |
@@ -252,7 +257,22 @@ Prefix dictionaries and C verify/decode modes cannot be combined with SFX.
 
 ## Release tests
 
-With GCC, Python 3.10+, py65, Java and KickAssembler available (set
+To test the extracted Windows ZIP, install Python 3.10+, the requirements below,
+Java 11+ and your own KickAssembler JAR, then run from the extracted folder:
+
+```sh
+python -m pip install -r requirements-test.txt
+python tools/test_release.py --kickass-jar /path/to/KickAss.jar
+python tools/test_examples.py --kickass-jar /path/to/KickAss.jar
+python tools/test_plugin.py --kickass-jar /path/to/KickAss.jar
+```
+
+These commands use the packaged executable and plugin without compiling either.
+Plugin tests assemble and execute raw/Mem examples, check multiple calls against
+the executable, and reject invalid input. Java source-level tests run only in a
+source checkout. VICE is optional for `tools/smoke_vice.py`.
+
+For the source checkout, with GCC, Python 3.10+, py65, a JDK and KickAssembler available (set
 `KICKASS_JAR` or pass `--kickass-jar` for direct Python invocations):
 
 ```sh
@@ -286,6 +306,6 @@ raw/Mem plugin examples. Run `make test-plugin` to check only the plugin.
 
 See [RELEASE.md](RELEASE.md) for the file manifest and validation record.
 The Windows package includes the executable and cross-platform plugin JAR.
-The JAR is also available separately; its source is in `plugin/`.
+The JAR inside the ZIP is cross-platform; its source is in the repository's `plugin/` directory.
 Original upstream notices are retained in [licenses](licenses); see
-[LICENSE](LICENSE) for the license applying to Kabutocrunch additions.
+[LICENSE](LICENSE) for the license applying to KabutoCrunch additions.
