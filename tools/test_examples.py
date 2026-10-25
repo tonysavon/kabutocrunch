@@ -5,11 +5,12 @@ import re
 import shutil
 import sys
 import tempfile
-from benchmark_cycles import ROOT, KICKASS, MPU, run, install_undocumented
+from benchmark_cycles import ROOT, KICKASS, MPU, run, install_undocumented, check_opcode
 from test_release import C64Memory
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--kickass-jar', type=pathlib.Path, default=KICKASS)
+parser.add_argument('--legal-opcodes', action='store_true')
 args = parser.parse_args()
 encoder = ROOT / ('kcrunch.exe' if sys.platform == 'win32' else 'kcrunch')
 run([sys.executable, str(ROOT / 'examples/make_data.py')])
@@ -28,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='kc-examples-') as directory:
         decoder = ROOT / 'src/asm' / ('dcrunch_dali.asm' if dali else 'dcrunch.asm')
         for mode in ('regular', 'inplace'):
             source = temp / (mode + ('_dali' if dali else '') + '.asm')
-            source.write_text((ROOT / 'examples' / source.name).read_text().replace(
+            source.write_text(('#define KCRUNCH_LEGAL_OPCODES\n' if args.legal_opcodes else '') + (ROOT / 'examples' / source.name).read_text().replace(
                 '../src/asm/' + decoder.name, decoder.as_posix()))
             image = temp / (mode + '.prg')
             run(['java', '-jar', str(args.kickass_jar.resolve()), str(source), '-o', str(image)])
@@ -40,11 +41,13 @@ with tempfile.TemporaryDirectory(prefix='kc-examples-') as directory:
             load = int.from_bytes(data[:2], 'little')
             memory.ram[load:load + len(data) - 2] = data[2:]
             cpu = MPU(memory=memory, pc=address('start'))
-            install_undocumented(cpu)
+            if not args.legal_opcodes:
+                install_undocumented(cpu)
             done = address("done")
             for _ in range(2_000_000):
                 if cpu.pc == done:
                     break
+                check_opcode(cpu, args.legal_opcodes)
                 cpu.step()
             else:
                 raise RuntimeError(f'{mode}: did not return')

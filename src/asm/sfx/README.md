@@ -15,3 +15,18 @@ small variants leave zero page overwritten and $01=$34.
 
 Rebuild `src/sfx.h` with `python tools/build_sfx.py --acme path/to/acme`.
 The header is committed so ordinary C builds do not require an assembler.
+
+## Optional legal instructions
+
+`KCRUNCH_LEGAL_OPCODES=1` selects documented 6502 replacements and assembles
+under `!cpu 6502`. Generate the separate header with:
+
+```sh
+python tools/build_sfx.py --legal-opcodes --acme path/to/acme
+```
+
+This writes `src/sfx_legal.h`; the default invocation still reproduces the
+original `src/sfx.h` exactly. `make legal` embeds the alternate arrays in
+`kcrunch-legal`, leaving the normal executable and release unchanged.
+The fast bootstrap grows by one byte, so its relocated copy-source offset in
+`src/kcrunch.c` is `$14` rather than `$13`. The small offset remains `$0d`.

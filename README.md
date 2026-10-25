@@ -32,6 +32,60 @@ Requires GCC (or a compatible C99 compiler) and GNU Make. The build creates
 The normal build uses `-Wall -Wextra -Werror`. No assembler is needed to build
 the cruncher: the SFX byte arrays are checked in.
 
+## Optional documented-opcode build
+
+Normal `make` and the binary release continue to use the smaller, faster NMOS
+6510 decoders, including undocumented instructions. To build an additional
+executable whose SFX loader uses only documented 6502 instructions:
+
+```sh
+make legal
+./kcrunch-legal --sfx 4096 -o game-sfx.prg game.prg
+```
+
+Windows builds produce `kcrunch-legal.exe`. This target does not replace
+`kcrunch`/`kcrunch.exe`, and release packaging still includes only the normal
+executable. Both sets of SFX arrays are checked in; ACME is not needed to build
+or use either cruncher. The alternate executable supports the same SFX options,
+including `--small`, `--effect`, and `--relocate-sfx`.
+
+For standalone decoding, define the symbol **before** importing either decoder:
+
+```asm
+#define KCRUNCH_LEGAL_OPCODES
+#define KABUTORAW
+#import "src/asm/dcrunch.asm"
+```
+
+The same symbol works with `dcrunch_dali.asm` and `ZX0RAW`, with either the raw
+or header-reading entry point, and with `INPLACE`. The compressor's non-SFX
+output is identical between builds; choosing the standalone decoder is an
+assembly-time decision, independent of which executable compressed the data.
+The KickAssembler plugin needs no change: define the symbol in the application
+that imports its decoder.
+
+With default fast literals, raw Kabuto/Dali decoders grow from 397/395 bytes to
+399/396 bytes. Legal SFX zero-page footprints are 238 bytes (fast), 245 (fast
+with effect), 187 (small), and 194 (small with effect), all below 255 bytes.
+The replacements add a few cycles at offset setup and SFX setup/length handling;
+the compressed formats and compression ratios are unchanged.
+
+This option is intended for SuperCPU and other processors without NMOS illegal
+opcodes. It supplies documented 6502 instructions, not a native 16-bit or
+machine-independent loader. For a 65816, use emulation mode with direct page
+and program/data banks zero, decimal mode clear, and the usual C64 memory
+mapping. Decoder code must be writable and buffers must obey the existing
+64 KiB layout restrictions. Real SuperCPU hardware has not yet been verified.
+
+```sh
+make test-legal KICKASS=/path/to/KickAss.jar
+python tools/build_sfx.py --legal-opcodes --acme path/to/acme --check
+```
+
+`make sfx-legal ACME=path/to/acme` regenerates only `src/sfx_legal.h`.
+Legal execution tests reject undocumented instructions without installing their
+emulation handlers; default tests continue to exercise the NMOS decoder.
+
 ## Encode and Verify
 
 ```sh

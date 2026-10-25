@@ -3,8 +3,10 @@ CFLAGS   = -O3 -std=c99 -Wall -Wextra -Werror -fomit-frame-pointer
 INCLUDES = -Isrc -Isrc/libdivsufsort/include
 ifeq ($(OS),Windows_NT)
 TARGET   = kcrunch.exe
+LEGAL_TARGET = kcrunch-legal.exe
 else
 TARGET   = kcrunch
+LEGAL_TARGET = kcrunch-legal
 endif
 KICKASS  ?= KickAss.jar
 ACME     ?= acme
@@ -22,6 +24,20 @@ all: $(TARGET)
 $(TARGET): $(SRCS) $(wildcard src/*.h src/libdivsufsort/include/*.h)
 
 	$(CC) $(CFLAGS) $(INCLUDES) $(SRCS) -o $@
+
+# Optional alternate executable; normal make and release packaging use TARGET.
+legal: $(LEGAL_TARGET)
+
+$(LEGAL_TARGET): $(SRCS) $(wildcard src/*.h src/libdivsufsort/include/*.h)
+	$(CC) $(CFLAGS) -DKCRUNCH_LEGAL_OPCODES $(INCLUDES) $(SRCS) -o $@
+
+test-legal: $(TARGET) $(LEGAL_TARGET)
+	python tools/test_release.py --legal-opcodes --kickass-jar "$(KICKASS)"
+	python tools/test_examples.py --legal-opcodes --kickass-jar "$(KICKASS)"
+	python tools/test_plugin.py --legal-opcodes --kickass-jar "$(KICKASS)"
+
+sfx-legal:
+	python tools/build_sfx.py --legal-opcodes --acme "$(ACME)"
 
 cycles: $(TARGET)
 
@@ -47,6 +63,6 @@ test-plugin: $(TARGET)
 
 clean:
 
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(LEGAL_TARGET)
 
-.PHONY: all cycles clean test sfx plugin test-plugin
+.PHONY: all legal test-legal sfx-legal cycles clean test sfx plugin test-plugin

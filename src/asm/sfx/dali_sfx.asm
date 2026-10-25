@@ -23,7 +23,11 @@
 ; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;
 
+!ifdef KCRUNCH_LEGAL_OPCODES {
+!cpu 6502
+} else {
 !cpu 6510
+}
 
 BITS_LEFT		= 1
 
@@ -67,7 +71,11 @@ BITS_LEFT		= 1
 -
 !ifdef SFX_FAST {
 		pha				;saved zp to stack down to $02
+!ifdef KCRUNCH_LEGAL_OPCODES {
+        lda .depacker_dst - 1,y ; X is immediately overwritten by the next LDX.
+} else {
 		lax <.depacker_dst - 1,y	;saves a byte, 2 byte compared to lda $0000,y
+}
 }
 sfx_src = * + 1
 		ldx .depacker_code - 1,y
@@ -108,7 +116,12 @@ lz_data_end = * + 1
                 dec <.src + 2
 lz_data_size_hi = * + 1
                 lda #$00			;check for last page to copy
+!ifdef KCRUNCH_LEGAL_OPCODES {
+                dec <.dst + 2
+                cmp <.dst + 2
+} else {
                 dcp <.dst + 2
+}
                 bne -
 
 		;ldy #$00			;is already 0
@@ -185,7 +198,12 @@ lz_effect
 .lz_m_page_
 		sbc #$01			;saves the sec and iny later on, if it results in a = $ff, no problem, we branch with the beq later on
 		bcs .lz_match_
+!ifdef KCRUNCH_LEGAL_OPCODES {
+        dec <lz_len_hi
+        cmp <lz_len_hi
+} else {
 		dcp <lz_len_hi			;as a = $ff this will decrement <lz_len_hi and set carry again in any case
+}
 }
 .lz_match_
 		eor #$ff

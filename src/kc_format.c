@@ -1,3 +1,4 @@
+#include <stddef.h>
 /* Dali's positive-integer interlaced Elias representation. */
 #include <limits.h>
 #include "kc_format.h"

@@ -10,7 +10,7 @@ import sys
 import tempfile
 import zipfile
 
-from benchmark_cycles import ROOT, KICKASS, MPU, install_undocumented, build_encoder
+from benchmark_cycles import ROOT, KICKASS, MPU, install_undocumented, build_encoder, check_opcode
 from test_release import C64Memory
 
 
@@ -24,6 +24,7 @@ def run(command):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--kickass-jar', type=pathlib.Path, default=KICKASS)
+    parser.add_argument('--legal-opcodes', action='store_true')
     args = parser.parse_args()
     kickass = args.kickass_jar.resolve()
     source_checkout = (ROOT / 'plugin/src/main/java').is_dir()
@@ -89,6 +90,8 @@ def main():
         execution_checks = 0
         for name in ('raw', 'mem', 'raw_dali', 'mem_dali'):
             text = (ROOT / 'examples/plugin' / (name + '.asm')).read_text()
+            if args.legal_opcodes:
+                text = '#define KCRUNCH_LEGAL_OPCODES\n' + text
             text = text.replace('../../src/asm/', (ROOT / 'src/asm').as_posix() + '/')
             # Execute both ascending and descending region order for every mode.
             for reverse in (False, True):
@@ -105,10 +108,12 @@ def main():
                 # Detect missing gap writes rather than relying on a zeroed emulator.
                 memory.ram[0x1000:0x4200] = b'\xa5' * len(expected)
                 cpu = MPU(memory=memory, pc=symbols['start'])
-                install_undocumented(cpu)
+                if not args.legal_opcodes:
+                    install_undocumented(cpu)
                 for _ in range(2_000_000):
                     if cpu.pc == symbols['done']:
                         break
+                    check_opcode(cpu, args.legal_opcodes)
                     cpu.step()
                 else:
                     raise AssertionError(name + ': decoder did not return')

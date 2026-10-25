@@ -1,3 +1,4 @@
+// Define KCRUNCH_LEGAL_OPCODES before importing for documented 6502 instructions.
 // Fast decoder for the classic Dali-compatible bitstream.
 //#define ZX0RAW
 // Comment out for a smaller decoder that keeps the other hot-path wins.
@@ -284,7 +285,12 @@ lz_match_len2:						//entry from new_offset handling
 lz_clc_back:
 lz_offset_lo:		sbc #$00			//carry is cleared, subtract (offset + 1) in fact we could use sbx here, but would not respect carry, but a and x are same, but need x later anyway for other purpose
 			sta lz_msrcr + 0
+#if KCRUNCH_LEGAL_OPCODES
+            lda lz_dst + 1
+            tax                         // Preserve carry for offset subtraction.
+#else
 			lax lz_dst + 1
+#endif
 			stx lz_mdst + 1
 lz_offset_hi:		sbc #$00
 			sta lz_msrcr + 1

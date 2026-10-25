@@ -1,3 +1,4 @@
+#include <stddef.h>
 /*
  * decode.c - strict C decoders for KabutoCrunch and classic Dali streams
  */

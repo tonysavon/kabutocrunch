@@ -1,5 +1,7 @@
 kcrunch
 kcrunch.exe
+kcrunch-legal
+kcrunch-legal.exe
 *.o
 __pycache__/
 *.py[cod]

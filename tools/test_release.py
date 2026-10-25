@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Portable deterministic round trips and full 6510 SFX execution tests."""
 import argparse
+from functools import partial
 import pathlib
 import random
 import subprocess
@@ -8,7 +9,7 @@ import tempfile
 
 from benchmark_cycles import (ROOT, KICKASS, DEFAULT_CASES, MPU, BenchmarkError,
                               build_encoder, run, assemble_decoder, count_cycles,
-                              install_undocumented, MAX_INSTRUCTIONS)
+                              install_undocumented, MAX_INSTRUCTIONS, check_opcode)
 
 
 class C64Memory:
@@ -39,14 +40,15 @@ class C64Memory:
 
 
 def execute_sfx(image, expected, destination, entry, target, small=False,
-                effect=False, port=0x37, cli=False):
+                effect=False, port=0x37, cli=False, legal_opcodes=False):
     memory = C64Memory()
     load = int.from_bytes(image[:2], 'little')
     assert load + len(image) - 2 <= 65536
     memory.ram[load:load + len(image) - 2] = image[2:]
     original_zp = bytes(memory.ram[:256])
     cpu = MPU(memory=memory, pc=entry)
-    install_undocumented(cpu)
+    if not legal_opcodes:
+        install_undocumented(cpu)
 
     def lax_zpy(mpu):
         mpu.a = mpu.x = mpu.ByteAt((mpu.ByteAt(mpu.pc) + mpu.y) & 255)
@@ -63,15 +65,17 @@ def execute_sfx(image, expected, destination, entry, target, small=False,
             mpu.p |= mpu.CARRY
         mpu.FlagsNZ((mpu.a - value) & 255)
 
-    for opcode, handler, cycles in ((0xb7, lax_zpy, 4), (0xc7, dcp_zp, 5)):
-        cpu.instruct[opcode] = handler
-        cpu.cycletime[opcode] = cycles
-        cpu.extracycles[opcode] = 0
-        cpu.disassemble[opcode] = ('SFX', 'zpg')
+    if not legal_opcodes:
+        for opcode, handler, cycles in ((0xb7, lax_zpy, 4), (0xc7, dcp_zp, 5)):
+            cpu.instruct[opcode] = handler
+            cpu.cycletime[opcode] = cycles
+            cpu.extracycles[opcode] = 0
+            cpu.disassemble[opcode] = ('SFX', 'zpg')
     for _ in range(MAX_INSTRUCTIONS):
         if cpu.pc == target:
             break
-        if cpu.disassemble[memory[cpu.pc]][0] == '???' or memory[cpu.pc] == 0:
+        check_opcode(cpu, legal_opcodes)
+        if memory[cpu.pc] == 0:
             raise BenchmarkError(f'SFX invalid opcode at ${cpu.pc:04x}')
         cpu.step()
     else:
@@ -84,7 +88,7 @@ def execute_sfx(image, expected, destination, entry, target, small=False,
     assert memory.ram[1] == (0x34 if small else port), '$01 not restored'
     assert bool(cpu.p & cpu.INTERRUPT) == (small or not cli), 'interrupt flag'
     if not small:
-        restored_end = 233 if effect else 226
+        restored_end = (233 if effect else 226) + (2 if legal_opcodes else 0)
         assert memory.ram[2:restored_end] == original_zp[2:restored_end], 'zero page restoration'
         assert cpu.sp == 255, 'stack restoration'
     if effect and len(expected) > 512 and expected == expected[:1] * len(expected):
@@ -96,7 +100,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--kickass-jar', type=pathlib.Path, default=KICKASS)
     parser.add_argument('--corpus', action='store_true', help='also test available local games')
+    parser.add_argument('--legal-opcodes', action='store_true')
     args = parser.parse_args()
+    measure = partial(count_cycles, legal_opcodes=args.legal_opcodes)
+    execute = partial(execute_sfx, legal_opcodes=args.legal_opcodes)
     rng = random.Random(640)
     cases = [('one', b'Q'), ('two', b'QQ')]
     for size in (7, 8, 127, 128, 255, 256, 257, 511, 512, 513, 4096):
@@ -109,9 +116,50 @@ def main():
     cases.append(('long-offset', distant + distant[:1024]))
     with tempfile.TemporaryDirectory(prefix='kc-release-') as directory:
         temp = pathlib.Path(directory)
-        encoder = build_encoder(temp)
-        decoders = [assemble_decoder(args.kickass_jar, temp, dali) for dali in (False, True)]
+        encoder = build_encoder(temp, args.legal_opcodes)
+        decoders = [assemble_decoder(args.kickass_jar, temp, dali, args.legal_opcodes) for dali in (False, True)]
         checks = 0
+        # Exercise header-reading entry points and the optional compact literal path.
+        for dali in (False, True):
+            data = b'abc' * 150 + b'Z' * 513
+            raw = temp / 'entry.bin'
+            packed = temp / 'entry.lz'
+            raw.write_bytes(data)
+            run([str(encoder), '--binfile', '--no-inplace',
+                 *(['--dali'] if dali else []), '-o', str(packed), str(raw)])
+            stream = packed.read_bytes()
+            for fast_literals in (False, True):
+                for raw_entry in (False, True):
+                    payload = assemble_decoder(args.kickass_jar, temp, dali,
+                                               args.legal_opcodes, fast_literals, raw_entry)
+                    measure(payload, (b'' if raw_entry else b'\x10\x00') + stream,
+                            data, 0x1000)
+                    checks += 1
+        if args.legal_opcodes:
+            # Default streams must remain interchangeable with the legal decoders.
+            reference_dir = temp / 'default'
+            reference_dir.mkdir()
+            reference = build_encoder(reference_dir)
+            for dali in (False, True):
+                for speed in (0, 2, 15):
+                    normal = temp / 'normal.lz'
+                    legal = temp / 'legal.lz'
+                    flags = ['--dali'] if dali else []
+                    for executable, output in ((reference, normal), (encoder, legal)):
+                        run([str(executable), '--binfile', '--no-inplace', '--speed',
+                             str(speed), *flags, '-o', str(output), str(raw)])
+                    assert normal.read_bytes() == legal.read_bytes(), 'stream changed'
+                    checks += 1
+        # Strict checks remain strict even after an NMOS CPU has been patched.
+        patched = MPU(memory=bytearray([0xa7]) + bytearray(65535), pc=0)
+        install_undocumented(patched)
+        assert MPU.disassemble[0xa7][0] == '???', 'shared opcode tables modified'
+        try:
+            check_opcode(patched, legal_opcodes=True)
+        except BenchmarkError:
+            checks += 1
+        else:
+            raise AssertionError('strict checker accepted undocumented LAX')
         # Keep self-modified code between calls: loaders commonly reuse it.
         for dali in (False, True):
             reusable = bytearray(decoders[dali])
@@ -121,7 +169,7 @@ def main():
                 raw.write_bytes(data)
                 run([str(encoder), '--binfile', *(['-dali'] if dali else []),
                      '-o', str(packed), str(raw)])
-                count_cycles(reusable, packed.read_bytes(), data, 0x1000)
+                measure(reusable, packed.read_bytes(), data, 0x1000)
                 checks += 1
         for name, data in cases:
             raw = temp / 'input.bin'
@@ -133,7 +181,7 @@ def main():
                     run([str(encoder), '--binfile', '--no-inplace', '--speed', str(speed),
                          *flags, '-o', str(packed), str(raw)])
                     run([str(encoder), '--binfile', *flags, '--verify-packed', str(packed), str(raw)])
-                    count_cycles(decoders[dali], packed.read_bytes(), data, 0x1000)
+                    measure(decoders[dali], packed.read_bytes(), data, 0x1000)
                     checks += 1
             if name in ('mixed', 'long', 'pages'):
                 for dali in (False, True):
@@ -141,7 +189,7 @@ def main():
                     flags = ['-dali'] if dali else []
                     run([str(encoder), '--binfile', '--short', '--speed', '15',
                          *flags, '-o', str(packed), str(raw)])
-                    count_cycles(decoders[dali], packed.read_bytes(), data, 0x1000)
+                    measure(decoders[dali], packed.read_bytes(), data, 0x1000)
                     checks += 1
             print(f'raw OK: {name}', flush=True)
         # Host-side format limits, not full-memory 6502 execution: the decoder,
@@ -186,7 +234,7 @@ def main():
                         if relocate:
                             flags += ['--relocate-sfx', '8192', '--01', '53', '--cli']
                         run([str(encoder), '--sfx', '1024', *flags, '-o', str(packed), str(prg)])
-                        execute_sfx(packed.read_bytes(), data, destination,
+                        execute(packed.read_bytes(), data, destination,
                                     8192 if relocate else 2061, 1024, small, effect,
                                     53 if relocate else 55, relocate)
                         checks += 1
@@ -198,7 +246,7 @@ def main():
             packed = temp / 'speed-sfx.prg'
             run([str(encoder), '--sfx', '1024', '--speed', str(speed),
                  '-o', str(packed), str(prg)])
-            execute_sfx(packed.read_bytes(), data, 0x1000, 2061, 1024)
+            execute(packed.read_bytes(), data, 0x1000, 2061, 1024)
             checks += 1
         for name, destination, data, flags in (
             ('empty', 0x1000, b'', []),

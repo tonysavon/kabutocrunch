@@ -2,7 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef KCRUNCH_LEGAL_OPCODES
+#include "sfx_legal.h"
+#define SFX_FAST_RELOC_SOURCE 0x14
+#else
 #include "sfx.h"
+#define SFX_FAST_RELOC_SOURCE 0x13
+#endif
 #include "kc_lib.h"
 #include "kc_format.h"
 #include "decode.h"
@@ -452,8 +458,8 @@ static void write_packed_stream(ctx* ctx) {
                 ctx->sfx_code[dali_sfx_src + 0] = (ctx->cbm_relocate_sfx_addr + 0xd) & 255;
                 ctx->sfx_code[dali_sfx_src + 1] = (ctx->cbm_relocate_sfx_addr + 0xd) >> 8;
             } else {
-                ctx->sfx_code[dali_sfx_src + 0] = (ctx->cbm_relocate_sfx_addr + 0x13) & 255;
-                ctx->sfx_code[dali_sfx_src + 1] = (ctx->cbm_relocate_sfx_addr + 0x13) >> 8;
+                ctx->sfx_code[dali_sfx_src + 0] = (ctx->cbm_relocate_sfx_addr + SFX_FAST_RELOC_SOURCE) & 255;
+                ctx->sfx_code[dali_sfx_src + 1] = (ctx->cbm_relocate_sfx_addr + SFX_FAST_RELOC_SOURCE) >> 8;
             }
             ctx->sfx_code[dali_data_end + 0] = (ctx->cbm_relocate_sfx_addr + ctx->sfx_size - 2 + (unsigned int)ctx->packed_size - 0x100 - 0x0c) & 0xff;
             ctx->sfx_code[dali_data_end + 1] = ((ctx->cbm_relocate_sfx_addr + ctx->sfx_size - 2 + (unsigned int)ctx->packed_size - 0x100 - 0x0c) >> 8) & 0xff;
@@ -1025,6 +1031,9 @@ int main(int argc, char *argv[]) {
 
     if (ctx.sfx) ctx.dali = TRUE;
     printf("KabutoCrunch - by Antonio Savona\n");
+#ifdef KCRUNCH_LEGAL_OPCODES
+    printf("SFX build: documented 6502 opcodes only\n");
+#endif
 
     if (argc <= 2 && show_version) exit(0);
     if (argc == 1 || !exit_help) {

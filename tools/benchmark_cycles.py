@@ -91,10 +91,11 @@ def run(command: list[str], cwd: pathlib.Path = ROOT) -> None:
         )
 
 
-def build_encoder(directory: pathlib.Path) -> pathlib.Path:
+def build_encoder(directory: pathlib.Path, legal_opcodes: bool = False) -> pathlib.Path:
     # Binary release ZIPs deliberately omit compiler sources.
     if not (ROOT / "src/kcrunch.c").is_file():
-        prebuilt = ROOT / ("kcrunch.exe" if sys.platform == "win32" else "kcrunch")
+        name = "kcrunch-legal" if legal_opcodes else "kcrunch"
+        prebuilt = ROOT / (name + (".exe" if sys.platform == "win32" else ""))
         if not prebuilt.is_file():
             raise BenchmarkError("This package needs its prebuilt kcrunch executable")
         return prebuilt
@@ -102,27 +103,36 @@ def build_encoder(directory: pathlib.Path) -> pathlib.Path:
     run([
         "gcc", "-O3", "-std=c99", "-Wall", "-Wextra", "-Werror",
         "-fomit-frame-pointer", "-Isrc", "-Isrc/libdivsufsort/include",
+        *(["-DKCRUNCH_LEGAL_OPCODES"] if legal_opcodes else []),
         *KCRUNCH_SOURCES, "-o", str(executable),
     ])
     return executable
 
 
 def assemble_decoder(jar: pathlib.Path, directory: pathlib.Path,
-                     dali: bool = False) -> bytes:
+                     dali: bool = False, legal_opcodes: bool = False,
+                     fast_literals: bool = True, raw: bool = True) -> bytes:
     source = directory / "cycle_decoder.asm"
     output = directory / "cycle_decoder.prg"
     prefix = "ZX0" if dali else "KABUTO"
     namespace = "zx0" if dali else "kabuto"
     decoder_name = "dcrunch_dali.asm" if dali else "dcrunch.asm"
     decoder = (ROOT / "src/asm" / decoder_name).resolve().as_posix()
+    decoder_text = pathlib.Path(decoder).read_text()
+    if not fast_literals:
+        decoder_text = decoder_text.replace('#define KCRUNCH_FAST_LITERALS',
+                                            '//#define KCRUNCH_FAST_LITERALS')
+    local_decoder = directory / decoder_name
+    local_decoder.write_text(decoder_text)
     source.write_text(
+        ("#define KCRUNCH_LEGAL_OPCODES\n" if legal_opcodes else "") +
         "* = $0200 \"cycle benchmark entry\"\n"
         "        ldy #$00\n        ldx #$00\n"
         "        lda #$00\n        sta.zp lz_dst\n"
         "        lda #$00\n        sta.zp lz_dst + 1\n"
-        f"        jsr {namespace}.rawdecrunch\n        brk\n"
-        f"#define {prefix}RAW\n"
-        f"#import \"{decoder}\"\n",
+        f"        jsr {namespace}.{'rawdecrunch' if raw else 'decrunch'}\n        brk\n"
+        + (f"#define {prefix}RAW\n" if raw else "")
+        + f'#import "{local_decoder.as_posix()}"\n',
         encoding="ascii",
     )
     run(["java", "-jar", str(jar), str(source), "-o", str(output)])
@@ -132,7 +142,21 @@ def assemble_decoder(jar: pathlib.Path, directory: pathlib.Path,
     return image[2:]
 
 
+DOCUMENTED_OPCODES = frozenset(i for i, entry in enumerate(MPU.disassemble)
+                              if entry[0] != "???")
+
+
+def check_opcode(cpu: MPU, legal_opcodes: bool = False) -> None:
+    opcode = cpu.memory[cpu.pc]
+    if (legal_opcodes and opcode not in DOCUMENTED_OPCODES) or cpu.disassemble[opcode][0] == "???":
+        raise BenchmarkError(f"unsupported opcode ${opcode:02x} at ${cpu.pc:04x}")
+
+
 def install_undocumented(cpu: MPU) -> None:
+    # py65 tables are class attributes: never contaminate later strict CPUs.
+    for name in ('instruct', 'cycletime', 'extracycles', 'disassemble'):
+        setattr(cpu, name, list(getattr(cpu, name)))
+
     def alr(mpu: MPU) -> None:
         mpu.a &= mpu.ByteAt(mpu.pc)
         mpu.pc += 1
@@ -179,7 +203,8 @@ def install_undocumented(cpu: MPU) -> None:
         cpu.disassemble[opcode] = mode
 
 
-def count_cycles(payload: bytes, stream: bytes, expected: bytes, destination: int) -> int:
+def count_cycles(payload: bytes, stream: bytes, expected: bytes, destination: int,
+                 legal_opcodes: bool = False) -> int:
     source = 0xfff0 - len(stream)
     if source <= ENTRY + len(payload):
         raise BenchmarkError("packed stream overlaps decoder")
@@ -195,13 +220,13 @@ def count_cycles(payload: bytes, stream: bytes, expected: bytes, destination: in
         memory.data[ENTRY + offset] = value
 
     cpu = MPU(memory=memory, pc=ENTRY)
-    install_undocumented(cpu)
+    if not legal_opcodes:
+        install_undocumented(cpu)
     memory.cpu = cpu
     memory.running = True
     instructions = 0
     while cpu.pc != STOP:
-        if cpu.disassemble[memory[cpu.pc]][0] == "???":
-            raise BenchmarkError(f"unsupported opcode at ${cpu.pc:04x}")
+        check_opcode(cpu, legal_opcodes)
         cpu.step()
         instructions += 1
         if instructions > MAX_INSTRUCTIONS:
@@ -230,6 +255,7 @@ def main() -> int:
                         help="encoder --speed bias; defaults to the encoder default")
     parser.add_argument("--dali", action="store_true",
                         help="benchmark classic Dali format and its fast decoder")
+    parser.add_argument("--legal-opcodes", action="store_true")
     args = parser.parse_args()
     if not args.kickass_jar.is_file():
         raise BenchmarkError(f"KickAssembler not found: {args.kickass_jar}")
@@ -244,8 +270,8 @@ def main() -> int:
     totals = [0, 0, 0]
     with tempfile.TemporaryDirectory(prefix="kabutocrunch-cycles-") as temp_name:
         temp = pathlib.Path(temp_name)
-        encoder = build_encoder(temp)
-        payload = assemble_decoder(args.kickass_jar, temp, args.dali)
+        encoder = build_encoder(temp, args.legal_opcodes)
+        payload = assemble_decoder(args.kickass_jar, temp, args.dali, args.legal_opcodes)
         print(f"decoder size: {len(payload) - ENTRY_STUB_SIZE} bytes")
         print("game          packed  output      cycles  cycles/byte")
         for name, path in cases:
@@ -265,7 +291,7 @@ def main() -> int:
             command += ["-o", str(packed), str(raw)]
             run(command)
             stream = packed.read_bytes()
-            cycles = count_cycles(payload, stream, expected, destination)
+            cycles = count_cycles(payload, stream, expected, destination, args.legal_opcodes)
             totals[0] += len(stream)
             totals[1] += len(expected)
             totals[2] += cycles
