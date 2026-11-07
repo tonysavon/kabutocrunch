@@ -64,8 +64,8 @@ assembly-time decision, independent of which executable compressed the data.
 The KickAssembler plugin needs no change: define the symbol in the application
 that imports its decoder.
 
-With default fast literals, raw Kabuto/Dali decoders grow from 397/395 bytes to
-399/396 bytes. Legal SFX zero-page footprints are 238 bytes (fast), 245 (fast
+With default fast literals, raw Kabuto/Dali decoders grow from 383/395 bytes to
+385/396 bytes. Legal SFX zero-page footprints are 238 bytes (fast), 245 (fast
 with effect), 187 (small), and 194 (small with effect), all below 255 bytes.
 The replacements add a few cycles at offset setup and SFX setup/length handling;
 the compressed formats and compression ratios are unchanged.
@@ -121,10 +121,10 @@ faster default parse.
 ## 6502 Decruncher
 
 [`src/asm/dcrunch.asm`](src/asm/dcrunch.asm) provides the native KabutoCrunch
-decruncher. Its default build is 397 bytes and measures 26.755 cycles/output
+decruncher. Its default build is 383 bytes and measures 25.555 cycles/output
 byte with the default parser setting, using **22.65% fewer cycles than the
 original Dali decoder** (321 bytes, 34.591 cycles/output byte). Comment out
-`KCRUNCH_FAST_LITERALS` for a 339-byte build measuring 29.958 cycles/output
+`KCRUNCH_FAST_LITERALS` for a 306-byte build measuring 28.994 cycles/output
 byte, still **13.39% fewer cycles than original Dali**.
 
 [`src/asm/dcrunch_dali.asm`](src/asm/dcrunch_dali.asm) provides KabutoCrunch's
