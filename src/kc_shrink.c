@@ -1968,7 +1968,6 @@ size_t salvador_compress(const unsigned char *pInputData,
    compressor.collect_diagnostics = pSearchDiagnostics != NULL;
 
    int nPreviousBlockSize = 0;
-   int nNumBlocks = 0;
    int nCurBitsOffset = 0, nCurBitShift = -1, nCurFinalLiterals = 0;
    int nBlockFlags = 1;
    int nCurRepMatchOffset = 1;
@@ -2013,7 +2012,6 @@ size_t salvador_compress(const unsigned char *pInputData,
          }
 
          nPreviousBlockSize = nInDataSize;
-         nNumBlocks++;
       }
 
       if (!nError && nOriginalSize < nInputSize) {

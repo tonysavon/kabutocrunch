@@ -23,7 +23,7 @@ def build(kickass, output=DEFAULT_JAR):
                         *map(str, sources)], check=True)
         output.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as jar:
-            entries = {'META-INF/MANIFEST.MF': b'Manifest-Version: 1.0\r\nImplementation-Title: Kabutocrunch KickAssembler Plugin\r\n\r\n'}
+            entries = {'META-INF/MANIFEST.MF': b'Manifest-Version: 1.0\r\nImplementation-Title: Kabutocrunch KickAssembler Plugin\r\nImplementation-Version: 1.01\r\n\r\n'}
             entries.update({p.relative_to(classes).as_posix(): p.read_bytes()
                             for p in sorted(classes.rglob('*.class'))})
             entries['LICENSE'] = (ROOT / 'LICENSE').read_bytes()

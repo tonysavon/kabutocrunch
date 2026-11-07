@@ -74,7 +74,7 @@ def main():
                 run([encoder, '--binfile', *flags, '--verify-packed', packed, source])
             print(f'PASS: {len(configurations)} Java/C byte comparisons and C decoder round trips', flush=True)
 
-        launcher = ['java', '-Xmx1g', '-cp', os.pathsep.join(map(str, (kickass, jar))), 'kickass.KickAssembler']
+        launcher = ['java', '-Xmx1g', '-cp', os.pathsep.join(map(str, (kickass, jar))), 'kickass.KickAssembler', '-symbolfile']
 
         def assemble(name, text):
             source = temp / (name + '.asm')

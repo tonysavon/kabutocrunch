@@ -1,5 +1,35 @@
 # Decompression performance
 
+## KabutoCrunch decoder update, 2026-11-06
+
+The 6502 decoder copies longer literal runs two bytes at a time, consumes
+already-buffered command bits directly, and takes shorter paths through offset
+and length decoding. The offset selector refills its control byte inline, and
+the two-byte match path sets its copy index only when needed. Both builds
+were tested on identical packed streams, with each output byte verified under
+`py65`.
+
+| Decoder / parser | Decoder bytes before → after | Packed bytes | Cycles before → after | Cycle reduction |
+|---|---:|---:|---:|---:|
+| Fast, default `--speed 2` | 397 → 383 | 138,772 | 8,809,705 → 8,414,465 | 4.49% |
+| Fast, `--speed 0` | 397 → 383 | 137,106 | 9,876,530 → 9,456,697 | 4.25% |
+| Compact, default `--speed 2` | 338 → 306 | 138,772 | 9,848,479 → 9,546,923 | 3.06% |
+
+The fast default averaged 25.555 cycles per output byte over 329,268 bytes.
+Individual games used 3.60% to 5.79% fewer cycles. These runs placed the
+decoder at `$0210`. At `$04f0`, the same default streams used 4.53% fewer
+cycles because branch page crossings depend on where the decoder is assembled.
+Comment out `KCRUNCH_FAST_LITERALS` for the 306-byte compact build.
+
+The offset and match-setup changes account for 70,108 of the cycles saved
+in the fast default. They reduced the 392-byte build from the literal-loop
+pass to 383 bytes.
+
+
+## Previous measurements
+
+# Decompression performance
+
 Measured on 2026-09-03 with `tools/benchmark_cycles.py`. The harness assembles
 the raw decoder with KickAssembler, runs it under `py65`, validates every
 output write, and reports 6502 cycles over six C64 games (329,268 output

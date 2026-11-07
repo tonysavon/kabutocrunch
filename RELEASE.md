@@ -1,4 +1,10 @@
-# KabutoCrunch 1.0
+# KabutoCrunch 1.01
+
+Minor fixes and decoding speed improvements.
+
+The native 6502 decoder now uses 4.49% fewer cycles on the six-game benchmark
+and shrinks from 397 to 383 bytes. Packed streams remain byte-for-byte compatible.
+The Java plugin is rebuilt from the current source with version metadata.
 
 ## Source repository contents
 
@@ -60,8 +66,8 @@ KERNAL IRQ handler; custom mappings require an appropriate visible handler.
 
 ## Packaging
 
-After building and testing, `python tools/package_release.py --version 1.0`
-creates `dist/kabutocrunch-1.0-windows-x64.zip` and `dist/SHA256SUMS.txt`.
+After building and testing, `python tools/package_release.py --version 1.01`
+creates `dist/kabutocrunch-1.01-windows-x64.zip` and `dist/SHA256SUMS.txt`.
 The manifest includes only the executable, plugin, docs/licenses, assembly,
 examples and binary-compatible Python tests. The executable and JAR must already
 have been built. Source remains available in the repository; it is not included

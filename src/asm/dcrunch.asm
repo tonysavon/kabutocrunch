@@ -9,12 +9,12 @@
 {
 	ldy #<src
 	ldx #>src
-
+	
 	lda #<dst
 	sta.zp lz_dst
-	lda #>dst
+	lda #>dst 
 	sta.zp lz_dst + 1
-
+	
 	jsr kabuto.rawdecrunch
 }
 #else
@@ -85,7 +85,6 @@ kabuto:
 			sty lz_offset_lo + 1           //initialize offset with $0000
 			sty lz_offset_hi + 1
 			// The branch operand is assembled for the initial distance-1 state.
-			// Keep this last: INPLACE startup relies on Z being set.
 			sty lz_len_hi
 
 
@@ -111,63 +110,34 @@ kabuto:
 			stx lz_offset_hi + 1
 			lda #MATCH_LOOP_RLE
 			sta lz_match_loop + 1
-			// Keep this last: INPLACE startup relies on Z being set.
 			stx lz_len_hi
 	#endif
-
-#if INPLACE
-
-			beq lz_start_over
-lz_end_check_:
-			ldx lz_dst + 0			//check for end condition when depacking inplace, lz_dst + 0 still in X
-			cpx lz_src + 0
-			bne lz_start_over
-lz_eof:
-			rts				//if lz_src + 1 gets incremented, the barrier check hits in even later, so at least one block is loaded, if it was $ff, we at least load the last block @ $ffxx, it must be the last block being loaded anyway
-lz_end_check:
-			cpx lz_src + 1
-			beq lz_end_check_		//we could check against src >= dst XXX TODO
-#else
-
-	lz_end_check:
-
+	
+#if INPLACE || KCRUNCH_FAST_LITERALS
+			jmp lz_start_over
 #endif
-lz_start_over:
-			lda #$01			//we fall through this check on entry and start with literal
-			:get_lz_bit()
-			beq lz_start_refill
-lz_start_bits_ready:
-			bcc lz_literal
-			jmp lz_match			//after each match check for another match or literal?
 
-lz_start_refill:
-			jsr lz_refill_control
-			jmp lz_start_bits_ready
-
-			//------------------
-			//LITERAL
-			//------------------
 #if KCRUNCH_FAST_LITERALS
-			// Runs of at least eight bytes advance both pointers, index backward
-			// to the next page boundary, and patch only the destination. This is
-			// one cycle/byte slower than patching both operands, but much smaller.
+			// For runs of six bytes or more, bias both pointers by
+			// length - 256 and start Y at -length. Copy forward in pairs
+			// so overlapping input is read before it can be overwritten.
 lz_cp_lit_fast_setup:
 			txa
 			clc
 			adc lz_src + 0
 			sta lz_src + 0
-			bcc !+
-			inc lz_src + 1
-!:
+			lda #$ff
+			adc lz_src + 1
+			sta lz_src + 1
+
 			txa
 			clc
 			adc lz_dst + 0
 			sta lz_dst + 0
-			bcc !+
-			inc lz_dst + 1
-!:
-			dec lz_src + 1
-			dec lz_dst + 1
+			lda #$ff
+			adc lz_dst + 1
+			sta lz_dst + 1
+
 			txa
 			eor #$ff
 			tay
@@ -175,21 +145,52 @@ lz_cp_lit_fast_setup:
 lz_cp_lit_fast_patch:
 			lda lz_dst + 0
 			sta lz_fast_dst + 0
+			sta lz_fast_dst_tail + 0
 			lda lz_dst + 1
 			sta lz_fast_dst + 1
+			sta lz_fast_dst_tail + 1
+			tya
+			lsr
+			bcs lz_cp_lit_fast_tail		// Odd count: enter on the second byte.
 lz_cp_lit_fast:
 			lda (lz_src),y
 .label lz_fast_dst = * + 1
 			sta $beef,y
 			iny
+lz_cp_lit_fast_tail:
+			lda (lz_src),y
+.label lz_fast_dst_tail = * + 1
+			sta $beef,y
+			iny
 			bne lz_cp_lit_fast
 			inc lz_src + 1
 			inc lz_dst + 1
-			sec
 			jmp lz_cp_lit_done
 #endif
 
+#if INPLACE
+lz_end_check_:
+			ldx lz_dst + 0
+			cpx lz_src + 0
+			bne lz_start_over
+lz_eof:
+			rts
+#endif
+lz_end_check:
+#if INPLACE
+			cpx lz_src + 1
+			beq lz_end_check_
+#endif
+lz_start_over:
+			// The first literal length uses an odd number of control bits.
+			// Subsequent tokens use an even number, including the command:
+			// a literal/repeat adds odd length bits, and a new match adds an
+			// offset selector plus even length bits (its first bit is embedded).
+			// The next command is therefore even-numbered and cannot refill.
+			:get_lz_bit()
+			bcs lz_match
 lz_literal:
+			lda #$01
 			:get_lz_bit()
 			bcs !skp+
 !:							//lz_length as inline
@@ -205,8 +206,8 @@ lz_literal:
 			tax
 lz_l_page_:
 #if KCRUNCH_FAST_LITERALS
-			and #$f8			//Preserve C: ANC/ALR would corrupt short literal runs.
-			bne lz_cp_lit_fast_setup
+			cpx #$06
+			bcs lz_cp_lit_fast_setup
 #endif
 lz_cp_lit:
 			lda (lz_src),y			///!\ Need to copy this way, or we run into danger to copy from an area that is yet blocked by barrier, this totally sucks, loading in order reveals that
@@ -223,21 +224,94 @@ lz_dst_inc_:
 
 lz_cp_lit_done:
 			lda lz_len_hi			//more pages to copy?
-			beq !+
-			jmp lz_l_page			//happens very seldom
-!:
-lz_literal_complete:
-
-			//------------------
-			//NEW OR OLD OFFSET
-			//------------------
-							//in case of type bit == 0 we can always receive length (not length - 1), can this used for an optimization? can we fetch length beforehand? and then fetch offset? would make length fetch simpler? place some other bit with offset?
-			rol				//was A = 0, C = 1 -> A = 1 with rol, but not if we copy literal this way
+			bne lz_l_page
+			// The command after a literal is also at an even bit position.
 			:get_lz_bit()
-			bcc lz_repeat			//either match with new offset or old offset
+			bcc lz_repeat
 
-			jmp lz_match
+lz_match:
+			:get_lz_bit()
+			bne lz_offset_selector_ready
+			// The offset selector is the first bit of this control byte.
+			lda (lz_src),y
+			:set_lz_bit_marker()
+			sta lz_bits
+			inc lz_src + 0
+			bne lz_offset_selector_ready
+			inc lz_src + 1
+lz_offset_selector_ready:
+			bcc lz_long_offset
+#if KCRUNCH_LEGAL_OPCODES
+            lda #$00
+            clc
+#else
+			anc #$00			//A = 0, C = 0: high-group low bit for metadata ROR
+#endif
+			sta lz_offset_hi + 1
+lz_offset_metadata:
+			ldx #MATCH_LOOP_NORMAL
+			lda (lz_src),y
+			ror				// Carry in is the low bit of the high group.
+							// Carry out is the first match-length bit.
+			sta lz_offset_lo + 1
 
+			// The stream stores distance - 1, so encoded offset zero is distance 1.
+			// Select a store-only loop for that case; preserve the embedded
+			// first match-length bit held in carry.
+			bne !set_match_loop+
+			lda lz_offset_hi + 1
+			bne !set_match_loop+
+			ldx #MATCH_LOOP_RLE
+!set_match_loop:
+			stx lz_match_loop + 1
+
+			inc lz_src + 0			//postponed, so no need to save A on next_page call
+			beq lz_inc_src1
+lz_inc_src1_:
+			lda #$01
+			bcs lz_short_match
+			// Y is still zero for any length refill.
+!:
+			:get_lz_bit()
+			rol
+			:get_lz_bit()
+			bcc !-
+			bne lz_match_big
+			jsr lz_refill_bits
+			bne lz_match_big
+			// The refill stores full-page lengths with the high byte biased
+			// down by one. Undo that bias before the new-offset length adds one.
+			inc lz_len_hi
+			jmp lz_match_big
+lz_short_match:
+			ldy #$fe			// Start the two-byte copy at Y = -2.
+			bne lz_match_len2
+
+lz_long_offset:
+			// Long offsets store their 7-bit-group high part directly. Zero is
+			// reserved for end-of-stream, so offset decoding has no Elias loop.
+			lda (lz_src),y
+			beq lz_long_offset_end
+			lsr
+			sta lz_offset_hi + 1
+			inc lz_src + 0
+			bne lz_offset_metadata
+			inc lz_src + 1
+			jmp lz_offset_metadata
+lz_long_offset_end:
+			rts
+
+lz_l_page:
+			dec lz_len_hi
+#if KCRUNCH_FAST_LITERALS
+			jmp lz_cp_lit_fast_patch
+#else
+			jmp lz_l_page_
+#endif
+
+lz_inc_src1:
+			inc lz_src + 1
+			jmp lz_inc_src1_
 lz_inc_src3:
 			inc lz_src + 1
 			jmp lz_inc_src3_
@@ -249,6 +323,7 @@ lz_dst_inc:
 			//REPEAT LAST OFFSET
 			//------------------
 lz_repeat:
+			lda #$01
 			:get_lz_bit()			//cheaper with 2 branches, as initial branch to lz_literal therefore is removed
 			bcs !skp+
 !:
@@ -271,16 +346,14 @@ lz_match_len2:						//entry from new_offset handling
 			adc lz_dst + 0
 			sta lz_dst + 0
 			sta lz_mdst + 0
-			bcc !+
-			jmp lz_clc			///!\ branch happens very seldom, if so, clear carry
-!:
-			dec lz_dst + 1			//subtract one more in this case
+			bcs lz_clc			// A low-byte carry cancels the page bias.
+			dec lz_dst + 1
 lz_clc_back:
 lz_offset_lo:		sbc #$00			//carry is cleared, subtract (offset + 1) in fact we could use sbx here, but would not respect carry, but a and x are same, but need x later anyway for other purpose
 			sta lz_msrcr + 0
 #if KCRUNCH_LEGAL_OPCODES
             lda lz_dst + 1
-            tax                         // Preserve carry for offset subtraction.
+            tax
 #else
 			lax lz_dst + 1
 #endif
@@ -301,123 +374,23 @@ lz_cp_store:
 
 			lda lz_len_hi			//check for more loop runs
 			bne !+
-			jmp lz_end_check		//do more page runs? Yes? Fall through
+			jmp lz_end_check
 !:
 			dec lz_len_hi
 			inc lz_msrcr + 1
 			inc lz_mdst + 1
 			jmp lz_cp_match
 
-lz_l_page:
-			dec lz_len_hi
-#if KCRUNCH_FAST_LITERALS
-			jmp lz_cp_lit_fast_patch
-#else
-			jmp lz_l_page_
-#endif
-
 
 			//------------------
 			//SELDOM STUFF
 			//------------------
-			//------------------
-			//MATCH
-			//------------------
-lz_long_offset:
-			// Long offsets store their 7-bit-group high part directly. Zero is
-			// reserved for end-of-stream, so offset decoding has no Elias loop.
-			lda (lz_src),y
-			beq lz_long_offset_end
-			lsr
-			sta lz_offset_hi + 1
-			inc lz_src + 0
-			bne !+
-			inc lz_src + 1
-!:
-			jmp lz_offset_metadata
-
-lz_match:
-			:get_lz_bit()
-			bne lz_offset_selector_ready
-			jsr lz_refill_control
-lz_offset_selector_ready:
-			bcc lz_long_offset
-#if KCRUNCH_LEGAL_OPCODES
-            lda #$00
-            clc                         // Metadata ROR needs A = 0 and C = 0.
-#else
-			anc #$00			//A = 0, C = 0: high-group low bit for metadata ROR
-#endif
-			sta lz_offset_hi + 1
-lz_offset_metadata:
-			lda (lz_src),y			//fetch another byte directly, same as refill_bits...
-			ror				//and shift -> first bit for lenth is in carry, and we have %0xxxxxxx xxxxxxxx as offset
-			sta lz_offset_lo + 1
-
-			// The stream stores distance - 1, so encoded offset zero is distance 1.
-			// Select a store-only loop for that case; preserve the embedded
-			// first match-length bit held in carry.
-			ldx #MATCH_LOOP_NORMAL
-			ora lz_offset_hi + 1
-			bne !set_match_loop+
-			ldx #MATCH_LOOP_RLE
-!set_match_loop:
-			stx lz_match_loop + 1
-
-			inc lz_src + 0			//postponed, so no need to save A on next_page call
-			beq lz_inc_src1
-lz_inc_src1_:
-			lda #$01
-			ldy #$fe
-			bcs lz_match_len2		//length = 1 ^ $ff, do it the very short way :-)
-lz_match_len:
-!:
-			:get_lz_bit()
-			rol
-			:get_lz_bit()
-			bcc !-
-			beq !refill+
-			jmp lz_match_big
-!refill:
-			ldy #$00			//only now y = 0 is needed
-			jsr lz_refill_bits		//fetch remaining bits
-			beq !+
-			jmp lz_match_big
-!:
-			inc lz_len_hi
-			bcc !+
-			jmp lz_match_big		//and enter match copy loop
-!:
-
-			//------------------
-			//SELDOM STUFF
-			//------------------
-lz_long_offset_end:
-			rts
 lz_clc:
 			clc
 			jmp lz_clc_back
-lz_inc_src1:
-			inc lz_src + 1			//preserves carry, all sane
-			bne lz_inc_src1_
 lz_inc_src2:
 			inc lz_src + 1			//preserves carry and A, clears X, Y, all sane
 			bne lz_inc_src2_
-
-lz_refill_control:
-			pha
-			lda (lz_src),y
-			:set_lz_bit_marker()
-			sta lz_bits
-			inc lz_src + 0
-			beq lz_refill_control_inc
-lz_refill_control_done:
-			pla
-			rts
-
-lz_refill_control_inc:
-			inc lz_src + 1
-			bne lz_refill_control_done
 
 			//------------------
 			//ELIAS FETCH
@@ -491,4 +464,4 @@ lz_length_16:						//happens very rarely
 !skp:
 			//rts
 }
-*/
+*/	

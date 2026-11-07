@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='kc-examples-') as directory:
             source.write_text(('#define KCRUNCH_LEGAL_OPCODES\n' if args.legal_opcodes else '') + (ROOT / 'examples' / source.name).read_text().replace(
                 '../src/asm/' + decoder.name, decoder.as_posix()))
             image = temp / (mode + '.prg')
-            run(['java', '-jar', str(args.kickass_jar.resolve()), str(source), '-o', str(image)])
+            run(['java', '-jar', str(args.kickass_jar.resolve()), '-symbolfile', str(source), '-o', str(image)])
             symbols = source.with_suffix('.sym').read_text()
             def address(label):
                 return int(re.search(r'\.label ' + label + r'=\$([0-9a-f]+)', symbols)[1], 16)

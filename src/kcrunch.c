@@ -1030,7 +1030,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (ctx.sfx) ctx.dali = TRUE;
-    printf("KabutoCrunch - by Antonio Savona\n");
+    printf("KabutoCrunch 1.01 - by Antonio Savona\n");
 #ifdef KCRUNCH_LEGAL_OPCODES
     printf("SFX build: documented 6502 opcodes only\n");
 #endif
